@@ -14,12 +14,13 @@ class RentalListing(BaseModel):
     city: str = "Paris"
     postal_code: Optional[str] = None
     address: Optional[str] = None
+    district_name: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
     price_eur: int = Field(gt=0)
     surface_m2: float = Field(gt=0)
-    rooms: Optional[float] = None
+    rooms: Optional[int] = None
     bedrooms: Optional[int] = None
 
     furnished: Optional[bool] = None

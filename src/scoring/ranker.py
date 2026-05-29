@@ -8,11 +8,11 @@ def compute_listing_score(listing: RentalListing) -> float:
 
     # Prix
     if listing.price_eur <= SEARCH_CRITERIA["max_price"]:
-        score += 35
+        score += 35 + (SEARCH_CRITERIA["max_price"] - listing.price_eur) * 0.1
 
     # Surface
     if listing.surface_m2 >= SEARCH_CRITERIA["min_surface_m2"]:
-        score += 15
+        score += 15 + (SEARCH_CRITERIA["min_surface_m2"] - listing.surface_m2) * 0.5
 
     # Nombre de pièces
     if listing.rooms and listing.rooms >= SEARCH_CRITERIA["min_rooms"]:
