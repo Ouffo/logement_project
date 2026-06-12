@@ -36,6 +36,7 @@ def save_listing(
     db_listing.furnished = listing.furnished
     db_listing.parking = listing.parking
     db_listing.quiet = listing.quiet
+    db_listing.image_url = listing.image_url
     db_listing.posted_at = listing.posted_at
     db_listing.collected_at = listing.collected_at
     db_listing.relevance_score = listing.relevance_score

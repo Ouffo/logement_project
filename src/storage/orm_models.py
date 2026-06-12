@@ -32,6 +32,7 @@ class RentalListingORM(Base):
     parking: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     quiet: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     relevance_score: Mapped[float | None] = mapped_column(Float)
 

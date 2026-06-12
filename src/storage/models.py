@@ -27,6 +27,7 @@ class RentalListing(BaseModel):
     parking: Optional[bool] = None
     quiet: Optional[bool] = None
 
+    image_url: Optional[str] = None
     posted_at: Optional[datetime] = None
     collected_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

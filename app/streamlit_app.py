@@ -7,12 +7,25 @@ from src.storage.orm_models import RentalListingORM
 
 st.set_page_config(
     page_title="Logements Paris",
-    layout="wide",
+    layout="centered",
+)
+
+st.markdown(
+    """
+    <style>
+    [data-testid="stVerticalBlockBorderWrapper"],
+    [data-testid="stVerticalBlockBorderWrapper"] > div {
+        border: 2px solid #333333 !important;
+        border-radius: 8px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 st.title("🏠 Logements pertinents")
 
-
+@st.cache_data(ttl=300)
 def load_listings() -> pd.DataFrame:
     session = SessionLocal()
 
@@ -28,6 +41,7 @@ def load_listings() -> pd.DataFrame:
                 {
                     "source": l.source,
                     "title": l.title,
+                    "postal_code": l.postal_code,
                     "price_eur": l.price_eur,
                     "surface_m2": l.surface_m2,
                     "rooms": l.rooms,
@@ -37,6 +51,7 @@ def load_listings() -> pd.DataFrame:
                     "quiet": l.quiet,
                     "score": l.relevance_score,
                     "url": l.url,
+                    "image_url": l.image_url,
                 }
                 for l in listings
             ]
@@ -90,29 +105,41 @@ st.subheader(f"{len(filtered)} annonces trouvées")
 
 for _, row in filtered.iterrows():
     with st.container(border=True):
-        st.markdown(f"### {row['title']}")
+        image_url = row.get("image_url")
+        has_image = pd.notna(image_url) and isinstance(image_url, str) and image_url.startswith("http")
 
-        st.write(
-            f"**{row['price_eur']} €** · "
-            f"{row['surface_m2']} m² · "
-            f"{row['rooms'] or '?'} pièce(s)"
-        )
+        if has_image:
+            left, right = st.columns([3, 2])
+        else:
+            left = st.container()
 
-        st.write(
-            f"Source: `{row['source']}` · "
-            f"Score: `{row['score']}`"
-        )
+        with left:
+            st.markdown(
+                f"**{row["price_eur"]} €** · "
+                f"{row["surface_m2"]} m² · "
+                f"{row["rooms"] or '?'} pièce(s) · "
+                f"{row["postal_code"]}"
+            )
 
-        tags = []
+            st.write(
+                f"Source : **{row["source"]}** · "
+                f"Score : **{row["score"]}**"
+            )
 
-        if row["furnished"]:
-            tags.append("Meublé")
-        if row["parking"]:
-            tags.append("Parking")
-        if row["quiet"]:
-            tags.append("Calme")
+            tags = []
 
-        if tags:
-            st.caption(" · ".join(tags))
+            if row["furnished"]:
+                tags.append("Meublé")
+            if row["parking"]:
+                tags.append("Parking")
+            if row["quiet"]:
+                tags.append("Calme")
 
-        st.link_button("Voir l’annonce", row["url"])
+            if tags:
+                st.caption(" · ".join(tags))
+
+            st.link_button("Voir l'annonce", row["url"])
+
+        if has_image:
+            with right:
+                st.image(image_url, width="stretch")

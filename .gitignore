@@ -16,3 +16,6 @@ __pycache__/
 *.pyd
 *.pdb
 *.egg-info/
+
+data/
+logs/
