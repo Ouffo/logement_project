@@ -23,8 +23,6 @@ def daily_pipeline():
             listings = extract_all_listings(source)
             # saving listing in DB
             save_listings(listings)
-            # score listings and save in DB
-            rescore_all_listings()
 
         session.commit()
         

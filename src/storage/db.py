@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 load_dotenv()
 
 DATABASE_URL = os.getenv(
-    "DATABASE_URL",
+    "DATABASE_URL_REMOTE",
     "postgresql+psycopg://logement:logement@localhost:5432/logement_db",
     )
 
