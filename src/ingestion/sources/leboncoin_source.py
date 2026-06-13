@@ -359,6 +359,7 @@ class LeboncoinSource(RentalListingSource):
 
         with browser_context() as context:
             search_page = open_page(context, self.search_url)
+            search_page.screenshot(path="debug_leboncoin.png", full_page=True)
             next_page = get_next_page_url(search_page)
             html_pages.append(get_rendered_html(search_page))
             logger.info(f"Page URL: {search_page.url}")

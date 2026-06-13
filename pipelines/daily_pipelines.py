@@ -10,7 +10,7 @@ def daily_pipeline():
 
     sources = [
         PapSource(),
-        LeboncoinSource(),  # Limit to 10 listings
+        LeboncoinSource(),
     ]
 
     try:

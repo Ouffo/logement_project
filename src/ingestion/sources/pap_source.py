@@ -287,6 +287,7 @@ class PapSource(RentalListingSource):
 
         with browser_context() as context:
             search_page = open_page(context, self.search_url)
+            search_page.screenshot(path="debug_pap.png", full_page=True)
             simulate_scroll(search_page)
             html = get_rendered_html(search_page)
             close_page(search_page)
