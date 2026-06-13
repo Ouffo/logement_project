@@ -31,4 +31,4 @@ jobs:
 
       - name: Run pipeline
         run: |
-          PYTHONPATH=. python pipelines/daily_pipeline.py
+          PYTHONPATH=. python pipelines/daily_pipelines.py
