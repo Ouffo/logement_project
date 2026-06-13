@@ -7,3 +7,4 @@ pydantic_core==2.46.4
 psycopg-binary==3.3.4
 loguru==0.7.3
 playwright==1.60.0
+python-dotenv==1.2.2
