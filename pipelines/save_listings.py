@@ -21,4 +21,5 @@ def save_listings(listings: list[RentalListing]):
 
         session.commit()
     finally:
+        logger.info("Closing database session")
         session.close()
