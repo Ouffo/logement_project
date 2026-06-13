@@ -296,6 +296,8 @@ class PapSource(RentalListingSource):
                 page = open_page(context, str(listing.url))
                 page.wait_for_timeout(1000)
                 raw_html = get_rendered_html(page)
+                logger.info(f"HTML type: {type(raw_html)}")
+                logger.info(f"HTML size: {len(raw_html) if isinstance(raw_html, str) else len(raw_html[1])}")
                 cleaned_html = extract_body_content(raw_html)
                 html_pages.append((str(listing.url), cleaned_html))
                 close_page(page)
