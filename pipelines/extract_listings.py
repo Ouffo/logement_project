@@ -10,6 +10,7 @@ def extract_all_listings(source: RentalListingSource):
 
     listings = []
     for file_path in folder.glob("*.html"):
+        logger.info(f"Processing file: {file_path}")
         html = file_path.read_text(encoding="utf-8")
         listings.extend(source.parser(html))
 
