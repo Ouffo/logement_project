@@ -1,9 +1,13 @@
 import pandas as pd
 import streamlit as st
+from pathlib import Path
+import sys
 
 from src.storage.db import SessionLocal
 from src.storage.orm_models import RentalListingORM
 
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT))
 
 st.set_page_config(
     page_title="Logements Paris",
