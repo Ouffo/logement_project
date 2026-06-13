@@ -13,4 +13,6 @@ def extract_all_listings(source: RentalListingSource):
         html = file_path.read_text(encoding="utf-8")
         listings.extend(source.parser(html))
 
+    logger.info(f"Extracted {len(listings)} listings from {folder}")
+
     return listings
