@@ -1,6 +1,5 @@
 from save_listings import save_listings
 from extract_listings import extract_all_listings
-from score_listings import rescore_all_listings
 from src.ingestion.sources.leboncoin_source import LeboncoinSource
 from src.ingestion.sources.pap_source import PapSource
 from src.storage.db import SessionLocal
@@ -22,7 +21,7 @@ def daily_pipeline():
             # Extract listings from html
             listings = extract_all_listings(source)
             # saving listing in DB
-            save_listings(listings)
+            save_listings(session, listings)
 
         session.commit()
         

@@ -1,12 +1,12 @@
+from sqlalchemy.orm import sessionmaker
+
 from src.processing.filters import is_valid_listing
 from src.scoring.ranker import compute_listing_score
 from src.storage.models import RentalListing
-from src.storage.db import SessionLocal
 from src.storage.repository import save_listing
 from src.utils.logger import logger
 
-def save_listings(listings: list[RentalListing]):
-    session = SessionLocal()
+def save_listings(session: sessionmaker, listings: list[RentalListing]):
 
     logger.info(f"Saving {len(listings)} listings to the database")
     try: 
