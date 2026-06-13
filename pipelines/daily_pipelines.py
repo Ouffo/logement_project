@@ -24,6 +24,10 @@ def daily_pipeline():
             save_listings(session, listings)
 
         session.commit()
+
+    except Exception:
+        session.rollback()
+        raise
         
     finally:
         session.close()
