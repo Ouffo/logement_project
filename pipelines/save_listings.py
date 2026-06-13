@@ -8,6 +8,7 @@ from src.utils.logger import logger
 def save_listings(listings: list[RentalListing]):
     session = SessionLocal()
 
+    logger.info(f"Saving {len(listings)} listings to the database")
     try: 
         valid_listings = [
             listing 
