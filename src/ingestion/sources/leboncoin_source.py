@@ -271,7 +271,6 @@ def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
 
         if not property_type:
             logger.info(f"Skipping listing without property type: {url}")
-            logger.info(f"Detail text = {combined_text}")
             continue
 
         # Premier prix visible
@@ -359,13 +358,9 @@ class LeboncoinSource(RentalListingSource):
 
         with browser_context() as context:
             search_page = open_page(context, self.search_url)
-            search_page.screenshot(path="debug_leboncoin.png", full_page=True)
+            search_page.wait_for_timeout(random.choice([2000, 5000]))  # Random wait to mimic human behavior
             next_page = get_next_page_url(search_page)
             html_pages.append(get_rendered_html(search_page))
-            logger.info(f"Page URL: {search_page.url}")
-            logger.info(f"Page title: {search_page.title()}")
-            logger.info(f"Article count: {search_page.locator('article').count()}")
-            logger.info(f"Body text preview: {search_page.locator('body').inner_text(timeout=5000)[:500]}")
             while next_page:
                 logger.info(f"Navigating to next page: {next_page}")
                 search_page.goto(next_page, wait_until="domcontentloaded", timeout=60000)

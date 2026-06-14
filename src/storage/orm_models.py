@@ -36,6 +36,9 @@ class RentalListingORM(Base):
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     relevance_score: Mapped[float | None] = mapped_column(Float)
 
+    is_active: Mapped[bool] = mapped_column(default=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC)

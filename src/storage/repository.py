@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
-
 from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
+from datetime import UTC, datetime
 
 
 def save_listing(
@@ -9,9 +9,14 @@ def save_listing(
     listing: RentalListing,
 ) -> RentalListingORM:
     
+    now = datetime.now(UTC)
+    
     db_listing = (
         session.query(RentalListingORM)
-        .filter(RentalListingORM.source_id == listing.source_id)
+        .filter(
+            RentalListingORM.source == listing.source,
+            RentalListingORM.source_id == listing.source_id
+        )
         .one_or_none()
     )
 
@@ -40,11 +45,9 @@ def save_listing(
     db_listing.posted_at = listing.posted_at
     db_listing.collected_at = listing.collected_at
     db_listing.relevance_score = listing.relevance_score
+    db_listing.is_active = True
+    db_listing.last_seen_at = now
     
-    session.commit()
-
-    session.refresh(db_listing)
-
     return db_listing
 
 def get_top_listings(
@@ -58,3 +61,16 @@ def get_top_listings(
         .limit(limit)
         .all()
     )
+
+def mark_missing_listings_inactive(session, source_name, latest_listings):
+    latest_ids = {listing.source_id for listing in latest_listings}
+
+    db_listings = (
+        session.query(RentalListingORM)
+        .filter(RentalListingORM.source == source_name)
+        .all()
+    )
+
+    for db_listing in db_listings:
+        if db_listing.source_id not in latest_ids:
+            db_listing.is_active = False

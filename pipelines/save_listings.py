@@ -18,4 +18,3 @@ def save_listings(session: sessionmaker, listings: list[RentalListing]):
     for listing in valid_listings:
         listing.relevance_score = compute_listing_score(listing)
         save_listing(session, listing)
-        logger.info(f"Saved listing with source_id: {listing.source_id}")

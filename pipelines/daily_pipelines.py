@@ -3,13 +3,14 @@ from extract_listings import extract_all_listings
 from src.ingestion.sources.leboncoin_source import LeboncoinSource
 from src.ingestion.sources.pap_source import PapSource
 from src.storage.db import SessionLocal
+from src.storage.repository import mark_missing_listings_inactive
 from src.utils.logger import logger
 
 def daily_pipeline():
     session = SessionLocal()
 
     sources = [
-        PapSource(),
+        #PapSource(),
         LeboncoinSource(),
     ]
 
@@ -22,6 +23,11 @@ def daily_pipeline():
             listings = extract_all_listings(source)
             # saving listing in DB
             save_listings(session, listings)
+            mark_missing_listings_inactive(
+                session=session,
+                source_name=source.name,
+                latest_listings=listings,
+            )
 
         session.commit()
 

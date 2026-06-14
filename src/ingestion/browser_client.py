@@ -74,7 +74,7 @@ from playwright.sync_api import sync_playwright, BrowserContext, Page
 
 
 @contextmanager
-def browser_context(headless: bool = True):
+def browser_context(headless: bool = False):
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
             user_data_dir="./ouffo_profile",
