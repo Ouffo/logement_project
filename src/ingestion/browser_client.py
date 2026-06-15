@@ -27,9 +27,12 @@ def scrap_page(source: Source, page, html_list):
         simulate_scroll(page)
 
         logger.info("Saving page content")
-        html_list.append(page.content())
+        return page.content()
 
-def fetch_rendered_html(url: str, headless: bool = False) -> list[str]:
+def fetch_rendered_html(
+    source: Source,
+    headless: bool = False
+) -> list[str]:
     html_list = []
     with sync_playwright() as p:
         
@@ -46,8 +49,8 @@ def fetch_rendered_html(url: str, headless: bool = False) -> list[str]:
 
         page = browser.new_page()
 
-        logger.info(f"Navigating to {url}")
-        page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        logger.info(f"Navigating to {source.search_url}")
+        page.goto(source.search_url, wait_until="domcontentloaded", timeout=60000)
         logger.info("Page loaded")
 
         #click on the cookie banner if it exists
@@ -55,7 +58,7 @@ def fetch_rendered_html(url: str, headless: bool = False) -> list[str]:
         #next_page = get_next_page_url(page)
         next_page = None
 
-        scrap_page(page, html_list)
+        scrap_page(source, page, html_list)
 
         while next_page:
             logger.info(f"Navigating to next page: {next_page}")

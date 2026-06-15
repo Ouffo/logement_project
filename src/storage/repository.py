@@ -74,3 +74,18 @@ def mark_missing_listings_inactive(session, source_name, latest_listings):
     for db_listing in db_listings:
         if db_listing.source_id not in latest_ids:
             db_listing.is_active = False
+
+def deduplicate_listings(listings):
+    seen = set()
+    deduped = []
+
+    for listing in listings:
+        key = (listing.source, listing.source_id)
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        deduped.append(listing)
+
+    return deduped

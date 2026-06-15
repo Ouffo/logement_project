@@ -1,9 +1,16 @@
 from pathlib import Path
+from src.ingestion.sources.bienici_source import BieniciSource
 from src.ingestion.sources.leboncoin_source import LeboncoinSource
+from src.ingestion.sources.pap_source import PapSource
 
+sources = {
+    "pap": PapSource(),
+    "leboncoin": LeboncoinSource(),
+    "bienici": BieniciSource()
+}
 
 def demo_extract_listings():
-    source = LeboncoinSource
+    source = sources["bienici"]
     folder = Path(source.storage_path)
     listings = []
     for file_path in folder.glob("*.html"):

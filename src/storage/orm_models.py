@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, Float, Integer, String, Text, DateTime
+from sqlalchemy import Boolean, Float, Integer, String, Text, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.storage.db import Base
@@ -9,10 +9,18 @@ from src.storage.db import Base
 class RentalListingORM(Base):
     __tablename__ = "rental_listings"
 
+    __table_args__ = (
+        UniqueConstraint(
+            "source",
+            "source_id",
+            name="uq_rental_listings_source_source_id",
+        ),
+    )
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     source: Mapped[str] = mapped_column(String(100))
-    source_id: Mapped[str] = mapped_column(String(255), unique=True)
+    source_id: Mapped[str] = mapped_column(String(255), index=True)
     url: Mapped[str] = mapped_column(Text)
 
     title: Mapped[str] = mapped_column(Text)
