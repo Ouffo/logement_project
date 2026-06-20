@@ -11,4 +11,8 @@ def is_valid_listing(listing: RentalListing) -> bool:
     if listing.surface_m2 < 25:
         logger.warning(f"{listing.title} has a surface area less than 25 m2")
         return False
+    text = f"{listing.title or ''} {listing.description or ''}".lower()
+    if "recherche" in text or "cherche" in text:
+        logger.warning(f"{listing.title} is a search request, not an offer")
+        return False
     return True

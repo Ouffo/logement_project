@@ -6,6 +6,7 @@ sys.path.append(str(ROOT))
 
 import pandas as pd
 import streamlit as st
+from sqlalchemy import or_
 from src.storage.db import SessionLocal
 from src.storage.orm_models import RentalListingORM
 
@@ -281,6 +282,13 @@ def load_listings() -> pd.DataFrame:
         listings = (
             session.query(RentalListingORM)
             .filter(RentalListingORM.is_active == True)
+            .filter(~RentalListingORM.title.ilike("%cherche%"))
+            .filter(
+                or_(
+                    RentalListingORM.description.is_(None),
+                    ~RentalListingORM.description.ilike("%cherche%"),
+                )
+            )
             .order_by(RentalListingORM.relevance_score.desc().nullslast())
             .all()
         )
