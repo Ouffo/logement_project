@@ -31,4 +31,8 @@ class RentalListing(BaseModel):
     posted_at: Optional[datetime] = None
     collected_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
+    construction_year: int | None = None
+    energy_class: str | None = None
+    details_fetched_at: datetime | None = None
+
     relevance_score: Optional[float] = None

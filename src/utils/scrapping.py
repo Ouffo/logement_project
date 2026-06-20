@@ -104,7 +104,7 @@ REMOVE_TEXT_PATTERNS = [
     "NB : Le propriétaire refuse le démarchage commercial",
 ]
 
-KEEP_ATTRS = {"href", "src", "alt"}
+KEEP_ATTRS = {"href", "src", "alt", "class"}
 
 
 def extract_body_content(html: str) -> str:

@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 import random
-
+from datetime import UTC, datetime
 from src.utils.logger import logger
 from src.utils.scrapping import get_next_page_url
 from src.processing.parsers import parse_french_posted_at, parse_price, parse_surface
@@ -13,6 +13,7 @@ from src.ingestion.browser_client import (
     close_page,
 )
 from src.storage.models import RentalListing
+from src.storage.orm_models import RentalListingORM
 from bs4 import BeautifulSoup
 
 def collect_leboncoin_listing_urls(page) -> list[str]:
@@ -230,6 +231,130 @@ def parse_surface_m2(text: str) -> float | None:
     return float(match.group(1).replace(",", "."))
 
 
+ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
+
+
+def parse_leboncoin_energy_class(html: str) -> str | None:
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text("\n", strip=True)
+
+    # Cas texte visible :
+    # "Classe énergie : D"
+    # "DPE : E"
+    # "Diagnostic de performance énergétique : C"
+    patterns = [
+        r"classe\s+énergie\s*[:\-]?\s*([A-G])\b",
+        r"classe\s+energetique\s*[:\-]?\s*([A-G])\b",
+        r"classe\s+énergétique\s*[:\-]?\s*([A-G])\b",
+        r"\bDPE\s*[:\-]?\s*([A-G])\b",
+        r"diagnostic\s+de\s+performance\s+énergétique\s*[:\-]?\s*([A-G])\b",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+
+        if match:
+            return match.group(1).upper()
+
+    # Fallback JSON / scripts
+    return parse_energy_class_from_json_like_text(html)
+
+
+def parse_leboncoin_energy(html: str) -> str | None:
+    # 1. Le plus fiable : JSON embarqué Leboncoin
+    patterns = [
+        r'"key"\s*:\s*"energy_rate"\s*,\s*"value"\s*:\s*"([a-g])"',
+        r'"key"\s*:\s*"energy_rate".{0,300}?"value"\s*:\s*"([a-g])"',
+        r'"key_label"\s*:\s*"Classe énergie".{0,300}?"value"\s*:\s*"([a-g])"',
+        r'"key_label"\s*:\s*"Classe énergie".{0,300}?"value_label"\s*:\s*"([A-G])"',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, html, flags=re.IGNORECASE | re.DOTALL)
+        if match:
+            return match.group(1).upper()
+
+    # 2. Fallback DOM visible
+    soup = BeautifulSoup(html, "html.parser")
+
+    block = soup.select_one('[data-qa-id="criteria_item_energy_rate"]')
+    if block:
+        texts = [t.strip() for t in block.stripped_strings]
+        for text in texts:
+            value = text.upper()
+            if value in ENERGY_CLASSES:
+                return value
+
+    return None
+
+def parse_energy_class_from_json_like_text(html: str) -> str | None:
+    patterns = [
+        r'"energy_class"\s*:\s*"([A-G])"',
+        r'"energyClass"\s*:\s*"([A-G])"',
+        r'"dpe"\s*:\s*"([A-G])"',
+        r'"ges"\s*:\s*"([A-G])"',  # à éviter si tu veux uniquement énergie, mais utile debug
+        r'"energy"\s*:\s*"([A-G])"',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, html, flags=re.IGNORECASE)
+
+        if match:
+            value = match.group(1).upper()
+
+            if value in ENERGY_CLASSES:
+                return value
+
+    return None
+
+def parse_leboncoin_construction_year(html: str) -> int | None:
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text("\n", strip=True)
+
+    patterns = [
+        r"année\s+de\s+construction\s*[:\-]?\s*(\d{4})",
+        r"année\s+construction\s*[:\-]?\s*(\d{4})",
+        r"construction\s*[:\-]?\s*(\d{4})",
+        r"construit\s+en\s+(\d{4})",
+        r"immeuble\s+de\s+(\d{4})",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+
+        if match:
+            year = int(match.group(1))
+
+            if is_plausible_construction_year(year):
+                return year
+
+    return parse_construction_year_from_json_like_text(html)
+
+
+def parse_construction_year_from_json_like_text(html: str) -> int | None:
+    patterns = [
+        r'"construction_year"\s*:\s*(\d{4})',
+        r'"constructionYear"\s*:\s*(\d{4})',
+        r'"yearOfConstruction"\s*:\s*(\d{4})',
+        r'"buildingYear"\s*:\s*(\d{4})',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, html, flags=re.IGNORECASE)
+
+        if match:
+            year = int(match.group(1))
+
+            if is_plausible_construction_year(year):
+                return year
+
+    return None
+
+
+def is_plausible_construction_year(year: int) -> bool:
+    return 1700 <= year <= 2030
+
+
 def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
     soup = BeautifulSoup(html, "html.parser")
 
@@ -343,11 +468,11 @@ def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
 
     return listings
 
-
 class LeboncoinSource(RentalListingSource):
     name = "leboncoin"
     search_url = "https://www.leboncoin.fr/recherche?category=8&locations=Paris__48.86017419624389_2.337177366534126_9370&price=800-1200"
     storage_path = "data/raw/leboncoin_htmls"
+    detail_storage_path = "data/raw/leboncoin_details_htmls"
     parser = staticmethod(parse_leboncoin_search_html)
 
     def __init__(self, max_listings: int | None = None):
@@ -376,3 +501,44 @@ class LeboncoinSource(RentalListingSource):
             file_path = folder / f"leboncoin_playwright_{i+1}.html"
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(html)
+
+    def fetch_detail_htmls(
+        self,
+        listings: list[RentalListingORM],
+    ) -> list[tuple[RentalListingORM, str]]:
+        detail_pages = []
+        folder = Path(self.detail_storage_path)
+
+        with browser_context() as context:
+            for listing in listings:
+                source_id = listing.url.rstrip("/").split("/")[-1]
+                if not (folder / f"{source_id}.html").exists():
+                    print(f"opening {listing.url}")
+                    page = open_page(context, str(listing.url))
+                    page.wait_for_timeout(random.choice([5000, 10000]))
+
+                    detail_pages.append(
+                        (listing, get_rendered_html(page))
+                    )
+
+                    close_page(page)
+                else:
+                    print(f"reading html {source_id}.html")
+                    file_path = Path(folder / f"{source_id}.html")
+                    html = file_path.read_text(encoding="utf-8")
+                    detail_pages.append(
+                        (listing, html)
+                    )
+
+        return detail_pages
+    
+    def enrich_listing(
+        self,
+        listing: RentalListingORM,
+        html: str,
+    ) -> None:
+
+        listing.energy_class = parse_leboncoin_energy(html)
+        listing.construction_year = parse_leboncoin_construction_year(html)
+        listing.details_fetched_at = datetime.now(UTC)
+        print(f"url: {listing.url}, energy class: {listing.energy_class}, construction data: {listing.construction_year}")

@@ -10,4 +10,4 @@ sources = {
     "bienici": BieniciSource()
 }
 
-sources["bienici"].fetch_html()
+sources["pap"].fetch_html()

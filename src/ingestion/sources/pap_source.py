@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from src.ingestion.sources.base import RentalListingSource
 from src.processing.parsers import parse_price, parse_surface
 from src.storage.models import RentalListing
+from src.storage.orm_models import RentalListingORM
 from datetime import datetime, UTC
 from src.utils.logger import logger
 from src.ingestion.browser_client import (
@@ -126,6 +127,23 @@ def parse_pap_posted_at(text: str) -> datetime | None:
 def parse_pap_source_id(url: str) -> str:
     return url.rstrip("/").split("-")[-1]
 
+def parse_pap_energy_class(section) -> str | None:
+    text_node = section.find(
+        string=lambda s: s and "Classe énergie" in s
+    )
+
+    if not text_node:
+        return None
+
+    energy_block = text_node.find_parent().find_next("ul")
+
+    if not energy_block:
+        return None
+
+    active = energy_block.select_one("li.active")
+
+    return active.get_text(strip=True) if active else None
+
 
 def parse_pap_detail_html(html: str) -> list[RentalListing]:
     soup = BeautifulSoup(html, "html.parser")
@@ -187,6 +205,10 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
             else None
         )
 
+        energy_class = parse_pap_energy_class(section)
+        if energy_class == None:
+            logger.info(f"energy class None for {url}")
+
         image_el = section.select_one('img[src^="https://cdn.pap.fr"]')
         image_url = image_el.get("src") if image_el else None
 
@@ -217,6 +239,7 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
                 quiet="calme" in full_text.lower(),
                 posted_at=posted_at,
                 image_url=image_url,
+                energy_class=energy_class
             )
         )
 
@@ -280,6 +303,7 @@ class PapSource(RentalListingSource):
     name = "pap"
     search_url = "https://www.pap.fr/annonce/locations-appartement-paris-75-g439-du-studio-au-2-pieces-a-partir-de-1-chambres-jusqu-a-1200-euros-a-partir-de-25-m2"
     storage_path = "data/raw/pap_htmls"
+    detail_storage_path = None
     parser = staticmethod(parse_pap_detail_html)
 
     def fetch_html(self):
@@ -296,8 +320,6 @@ class PapSource(RentalListingSource):
                 page = open_page(context, str(listing.url))
                 page.wait_for_timeout(1000)
                 raw_html = get_rendered_html(page)
-                logger.info(f"HTML type: {type(raw_html)}")
-                logger.info(f"HTML size: {len(raw_html) if isinstance(raw_html, str) else len(raw_html[1])}")
                 cleaned_html = extract_body_content(raw_html)
                 html_pages.append((str(listing.url), cleaned_html))
                 close_page(page)
@@ -310,3 +332,12 @@ class PapSource(RentalListingSource):
         file_path = folder / "pap_playwright.html"
         with open(file_path, "w", encoding="utf-8") as file:
             file.write(combined_html)
+
+    def fetch_detail_htmls(self, _: list[RentalListingORM]):
+        return []
+    
+    def enrich_listing(
+        self, 
+        _: RentalListingORM,
+        __: str,):
+        return None

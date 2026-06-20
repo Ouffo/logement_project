@@ -44,6 +44,10 @@ class RentalListingORM(Base):
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     relevance_score: Mapped[float | None] = mapped_column(Float)
 
+    construction_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    energy_class: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    details_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     is_active: Mapped[bool] = mapped_column(default=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)
 

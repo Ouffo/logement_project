@@ -21,7 +21,11 @@ if DATABASE_URL.startswith("postgresql://"):
 if DATABASE_URL is None:
     raise RuntimeError("DATABASE_URL is not set")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args={"options": "-c lock_timeout=30s -c statement_timeout=60s"},
+)
 
 SessionLocal = sessionmaker(
     bind=engine,

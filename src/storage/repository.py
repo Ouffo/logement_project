@@ -1,5 +1,7 @@
+from pathlib import Path
 from sqlalchemy.orm import Session
 from src.storage.models import RentalListing
+from src.ingestion.sources.base import RentalListingSource
 from src.storage.orm_models import RentalListingORM
 from datetime import UTC, datetime
 
@@ -45,6 +47,9 @@ def save_listing(
     db_listing.posted_at = listing.posted_at
     db_listing.collected_at = listing.collected_at
     db_listing.relevance_score = listing.relevance_score
+    db_listing.energy_class = listing.energy_class
+    db_listing.construction_year = listing.construction_year
+    db_listing.details_fetched_at = listing.details_fetched_at
     db_listing.is_active = True
     db_listing.last_seen_at = now
     
@@ -89,3 +94,30 @@ def deduplicate_listings(listings):
         deduped.append(listing)
 
     return deduped
+
+def enrich_listings(
+    source: RentalListingSource, 
+    listings: list[RentalListingORM], 
+) -> None:
+    
+    detail_htmls = source.fetch_detail_htmls(listings)
+
+    if source.detail_storage_path is not None:
+        folder = Path(source.detail_storage_path)
+        folder.mkdir(parents=True, exist_ok=True)
+
+        for listing, html in detail_htmls:
+            file_path = folder / f"{listing.source_id}.html"
+            with open(file_path, "w", encoding="utf-8") as file:
+                file.write(html)
+            source.enrich_listing(listing, html)
+        
+
+def get_listings_to_enrich(session, source_name: str) -> list[RentalListingORM]:
+    return (
+        session.query(RentalListingORM)
+        .filter(RentalListingORM.source == source_name)
+        .filter(RentalListingORM.is_active == True)
+        .filter(RentalListingORM.details_fetched_at == None)
+        .all()
+    )

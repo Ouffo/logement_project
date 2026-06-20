@@ -217,6 +217,53 @@ st.markdown(
         background: #4a1d84;
     }
 
+    /* Energy class rating */
+    .energy-label {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        margin-top: 0.3rem;
+    }
+    .energy-label-title {
+        font-size: 0.72rem;
+        color: #6b7280;
+        font-weight: 500;
+        margin-right: 4px;
+        white-space: nowrap;
+    }
+    .energy-box {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 3px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: rgba(255,255,255,0.75);
+        opacity: 0.38;
+    }
+    .energy-box.active {
+        width: 26px;
+        height: 26px;
+        font-size: 0.82rem;
+        color: #fff;
+        opacity: 1;
+        box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(0,0,0,0.25);
+    }
+    .energy-A  { background: #00A550; }
+    .energy-B  { background: #51B747; }
+    .energy-C  { background: #BAD434; color: rgba(0,0,0,0.6); }
+    .energy-C.active { color: rgba(0,0,0,0.8); }
+    .energy-D  { background: #FFF200; color: rgba(0,0,0,0.6); }
+    .energy-D.active { color: rgba(0,0,0,0.8); }
+    .energy-E  { background: #F7A600; }
+    .energy-F  { background: #F15A29; }
+    .energy-G  { background: #EE1D23; }
+
+    /* Construction year badge */
+    .tag-year { background: #f3f4f6; color: #374151; }
+
     /* Hide streamlit link button default style */
     .stLinkButton a {
         display: none;
@@ -253,12 +300,28 @@ def load_listings() -> pd.DataFrame:
                     "score": l.relevance_score,
                     "url": l.url,
                     "image_url": l.image_url,
+                    "energy_class": l.energy_class,
+                    "construction_year": l.construction_year,
                 }
                 for l in listings
             ]
         )
     finally:
         session.close()
+
+
+_ENERGY_CLASSES = ["A", "B", "C", "D", "E", "F", "G"]
+
+
+def render_energy_label(energy_class: str) -> str:
+    ec = energy_class.upper()
+    if ec not in _ENERGY_CLASSES:
+        return ""
+    boxes = "".join(
+        f'<span class="energy-box energy-{c}{"  active" if c == ec else ""}">{c}</span>'
+        for c in _ENERGY_CLASSES
+    )
+    return f'<div class="energy-label"><span class="energy-label-title">Classe énergie</span>{boxes}</div>'
 
 
 def score_class(score):
@@ -285,6 +348,8 @@ def render_card(row):
     quiet = row.get("quiet")
     score = row.get("score")
     url = row.get("url") or "#"
+    energy_class = row.get("energy_class")
+    construction_year = row.get("construction_year")
 
     price_str = f"{int(price)} €" if pd.notna(price) else "— €"
     surface_str = f"{int(surface)} m²" if pd.notna(surface) else "— m²"
@@ -297,6 +362,12 @@ def render_card(row):
         tags_html += '<span class="tag tag-parking">Parking</span>'
     if quiet:
         tags_html += '<span class="tag tag-quiet">Calme</span>'
+    if construction_year and pd.notna(construction_year):
+        tags_html += f'<span class="tag tag-year">Construit en {int(construction_year)}</span>'
+
+    energy_html = ""
+    if energy_class and pd.notna(energy_class) and isinstance(energy_class, str):
+        energy_html = render_energy_label(energy_class)
 
     score_html = ""
     if pd.notna(score):
@@ -323,11 +394,10 @@ def render_card(row):
                     {rooms_str}
                 </div>
                 <div class="listing-location">📍 Paris {postal}</div>
-                <div class="listing-tags">{tags_html}</div>
+                <div class="listing-tags">{tags_html}</div>{energy_html}
             </div>
             <div class="listing-footer">
-                <a class="cta-link" href="{url}" target="_blank">Voir l'annonce →</a>
-                {score_html}
+                <a class="cta-link" href="{url}" target="_blank">Voir l'annonce →</a>{score_html}
             </div>
         </div>
     </div>
@@ -359,10 +429,36 @@ with st.container():
         source_opts = ["Toutes"] + sorted(df["source"].dropna().unique().tolist())
         source = st.selectbox("Source", source_opts)
 
+    c4, c5, c6 = st.columns([2, 2, 2])
+    with c4:
+        energy_opts = ["Toutes"] + _ENERGY_CLASSES
+        energy_max = st.selectbox(
+            "Classe énergie (max acceptable)",
+            energy_opts,
+            help="Ex. : choisir D affiche les classes A, B, C et D",
+        )
+        include_unknown_energy = st.checkbox("Inclure annonces sans DPE", value=True)
+    with c5:
+        year_min = st.slider("Année de construction min", 1800, 2026, 1800, 10)
+        include_unknown_year = st.checkbox("Inclure annonces sans année", value=True)
+
 # ── Filtering ────────────────────────────────────────────────────────────────
 filtered = df[(df["price_eur"] <= max_price) & (df["surface_m2"] >= min_surface)]
 if source != "Toutes":
     filtered = filtered[filtered["source"] == source]
+
+if energy_max != "Toutes":
+    allowed = _ENERGY_CLASSES[: _ENERGY_CLASSES.index(energy_max) + 1]
+    mask = filtered["energy_class"].isin(allowed)
+    if include_unknown_energy:
+        mask = mask | filtered["energy_class"].isna()
+    filtered = filtered[mask]
+
+if year_min > 1800:
+    mask = (filtered["construction_year"] >= year_min).fillna(False)
+    if include_unknown_year:
+        mask = mask | filtered["construction_year"].isna()
+    filtered = filtered[mask]
 
 # ── Results ──────────────────────────────────────────────────────────────────
 st.markdown(

@@ -10,7 +10,7 @@ sources = {
 }
 
 def demo_extract_listings():
-    source = sources["bienici"]
+    source = sources["pap"]
     folder = Path(source.storage_path)
     listings = []
     for file_path in folder.glob("*.html"):
@@ -18,8 +18,8 @@ def demo_extract_listings():
         listings.extend(source.parser(html))
 
     print(f"Extracted {len(listings)} listings.")
-    for listing in listings[:10]:
-        print(f"Title: {listing.title}\nPrice: {listing.price_eur}, Surface: {listing.surface_m2}, Location: {listing.postal_code}, Rooms: {listing.rooms}, URL: {listing.url}\n, description: {listing.description}\n") 
+    for listing in listings:        
+        print(f"url: {listing.url} \n energy class: {listing.energy_class}")
 
 if __name__ == "__main__":
     demo_extract_listings()
