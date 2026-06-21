@@ -265,6 +265,13 @@ st.markdown(
     /* Construction year badge */
     .tag-year { background: #f3f4f6; color: #374151; }
 
+    /* Posted date */
+    .listing-posted {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin: 0.15rem 0;
+    }
+
     /* Hide streamlit link button default style */
     .stLinkButton a {
         display: none;
@@ -310,6 +317,7 @@ def load_listings() -> pd.DataFrame:
                     "image_url": l.image_url,
                     "energy_class": l.energy_class,
                     "construction_year": l.construction_year,
+                    "posted_at": l.posted_at,
                 }
                 for l in listings
             ]
@@ -358,6 +366,7 @@ def render_card(row):
     url = row.get("url") or "#"
     energy_class = row.get("energy_class")
     construction_year = row.get("construction_year")
+    posted_at = row.get("posted_at")
 
     price_str = f"{int(price)} €" if pd.notna(price) else "— €"
     surface_str = f"{int(surface)} m²" if pd.notna(surface) else "— m²"
@@ -376,6 +385,14 @@ def render_card(row):
     energy_html = ""
     if energy_class and pd.notna(energy_class) and isinstance(energy_class, str):
         energy_html = render_energy_label(energy_class)
+
+    posted_html = ""
+    if posted_at is not None and pd.notna(posted_at):
+        try:
+            date_str = pd.Timestamp(posted_at).strftime("%d/%m/%Y")
+            posted_html = f'<div class="listing-posted">Publiée le {date_str}</div>'
+        except Exception:
+            pass
 
     score_html = ""
     if pd.notna(score):
@@ -402,6 +419,7 @@ def render_card(row):
                     {rooms_str}
                 </div>
                 <div class="listing-location">📍 Paris {postal}</div>
+                {posted_html}
                 <div class="listing-tags">{tags_html}</div>{energy_html}
             </div>
             <div class="listing-footer">
@@ -449,6 +467,8 @@ with st.container():
     with c5:
         year_min = st.slider("Année de construction min", 1800, 2026, 1800, 10)
         include_unknown_year = st.checkbox("Inclure annonces sans année", value=True)
+    with c6:
+        sort_by_date = st.toggle("Afficher par ordre récent", value=False)
 
 # ── Filtering ────────────────────────────────────────────────────────────────
 filtered = df[(df["price_eur"] <= max_price) & (df["surface_m2"] >= min_surface)]
@@ -467,6 +487,10 @@ if year_min > 1800:
     if include_unknown_year:
         mask = mask | filtered["construction_year"].isna()
     filtered = filtered[mask]
+
+# ── Sort ─────────────────────────────────────────────────────────────────────
+if sort_by_date:
+    filtered = filtered.sort_values("posted_at", ascending=False, na_position="last")
 
 # ── Results ──────────────────────────────────────────────────────────────────
 st.markdown(

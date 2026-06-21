@@ -312,6 +312,45 @@ def parse_bienici_construction_year(section) -> int | None:
 
     return None
 
+
+FRENCH_MONTHS = {
+    "janvier": 1, "janv": 1, "janv.": 1,
+    "février": 2, "fevrier": 2, "févr": 2, "févr.": 2, "fevr": 2, "fevr.": 2,
+    "mars": 3,
+    "avril": 4, "avr": 4, "avr.": 4,
+    "mai": 5,
+    "juin": 6,
+    "juillet": 7, "juil": 7, "juil.": 7,
+    "août": 8, "aout": 8,
+    "septembre": 9, "sept": 9, "sept.": 9,
+    "octobre": 10, "oct": 10, "oct.": 10,
+    "novembre": 11, "nov": 11, "nov.": 11,
+    "décembre": 12, "decembre": 12, "déc": 12, "déc.": 12, "dec": 12, "dec.": 12,
+}
+
+def parse_bienici_posted_at(section) -> datetime | None:
+    text = section.get_text("\n", strip=True)
+
+    match = re.search(
+        r"Publiée?\s+le\s+(\d{1,2})\s+([a-zéûîôàèùç.]+)\s+(\d{4})",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return None
+
+    day = int(match.group(1))
+    month_name = match.group(2).lower()
+    year = int(match.group(3))
+
+    month = FRENCH_MONTHS.get(month_name)
+
+    if month is None:
+        return None
+
+    return datetime(year, month, day, tzinfo=UTC)
+
 class BieniciSource(RentalListingSource):
     name = "bienici"
     search_url = "https://www.bienici.com/recherche/location/paris-75000/appartement/1-piece-et-plus?prix-max=1200&surface-min=25"
@@ -392,5 +431,6 @@ class BieniciSource(RentalListingSource):
 
         listing.energy_class = parse_bienici_energy_class(section=section)
         listing.construction_year = parse_bienici_construction_year(section=section)
+        listing.posted_at = parse_bienici_posted_at(section=section)
         listing.details_fetched_at = datetime.now(UTC)
-        print(f"url: {listing.url}, energy class: {listing.energy_class}, construction data: {listing.construction_year}")
+        print(f"url: {listing.url}, posted date: {listing.posted_at}")

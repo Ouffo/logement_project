@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 import random
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from src.utils.logger import logger
 from src.utils.scrapping import get_next_page_url
 from src.processing.parsers import parse_french_posted_at, parse_price, parse_surface
@@ -354,6 +354,72 @@ def parse_construction_year_from_json_like_text(html: str) -> int | None:
 def is_plausible_construction_year(year: int) -> bool:
     return 1700 <= year <= 2030
 
+def parse_leboncoin_posted_at(html: str) -> datetime | None:
+    return (
+        parse_leboncoin_posted_at_from_json(html)
+        or parse_leboncoin_posted_at_from_visible_text(html)
+    )
+
+
+def parse_leboncoin_posted_at_from_json(html: str) -> datetime | None:
+    for field in ["index_date", "first_publication_date"]:
+        match = re.search(
+            rf'"{field}"\s*:\s*"(\d{{4}}-\d{{2}}-\d{{2}})\s+(\d{{2}}):(\d{{2}}):(\d{{2}})"',
+            html,
+        )
+
+        if match:
+            return datetime(
+                int(match.group(1)[0:4]),
+                int(match.group(1)[5:7]),
+                int(match.group(1)[8:10]),
+                int(match.group(2)),
+                int(match.group(3)),
+                int(match.group(4)),
+                tzinfo=UTC,
+            )
+
+    return None
+
+
+def parse_leboncoin_posted_at_from_visible_text(html: str) -> datetime | None:
+    text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
+
+    match = re.search(
+        r"(aujourd'hui|hier|\d{1,2}/\d{1,2}/\d{4})\s+à\s+(?:\d{1,2}\s+heures?\s+\d{2}|(\d{1,2}):(\d{2}))",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return None
+
+    date_part = match.group(1).lower()
+    today = datetime.now(UTC).date()
+
+    if date_part == "aujourd'hui":
+        date_value = today
+    elif date_part == "hier":
+        date_value = today - timedelta(days=1)
+    else:
+        date_value = datetime.strptime(date_part, "%d/%m/%Y").date()
+
+    time_match = re.search(r"(\d{1,2}):(\d{2})", match.group(0))
+    if not time_match:
+        time_match = re.search(r"(\d{1,2})\s+heures?\s+(\d{2})", match.group(0))
+
+    if not time_match:
+        return None
+
+    return datetime(
+        date_value.year,
+        date_value.month,
+        date_value.day,
+        int(time_match.group(1)),
+        int(time_match.group(2)),
+        tzinfo=UTC,
+    )
+
 
 def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
     soup = BeautifulSoup(html, "html.parser")
@@ -540,5 +606,6 @@ class LeboncoinSource(RentalListingSource):
 
         listing.energy_class = parse_leboncoin_energy(html)
         listing.construction_year = parse_leboncoin_construction_year(html)
+        listing.posted_at = parse_leboncoin_posted_at(html)
         listing.details_fetched_at = datetime.now(UTC)
-        print(f"url: {listing.url}, energy class: {listing.energy_class}, construction data: {listing.construction_year}")
+        print(f"url: {listing.url}, posted date: {listing.posted_at}")
