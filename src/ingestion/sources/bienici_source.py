@@ -3,6 +3,7 @@ import re
 from datetime import UTC, datetime
 from bs4 import BeautifulSoup
 from pathlib import Path
+from src.storage.repository import clean_htmls
 from src.ingestion.browser_client import browser_context, close_page, get_rendered_html, open_page
 from src.ingestion.sources.base import RentalListingSource
 from src.storage.models import RentalListing
@@ -362,6 +363,7 @@ class BieniciSource(RentalListingSource):
         self.max_listings = max_listings
 
     def fetch_html(self):
+        clean_htmls(self.storage_path)
         html_pages = []
 
         with browser_context() as context:

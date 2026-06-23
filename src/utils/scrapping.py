@@ -7,13 +7,20 @@ from urllib.parse import urljoin
 
 def dismiss_cookie_banner(page):
     page.wait_for_timeout(2000)  # Wait for 2 seconds to ensure the cookie banner is loaded
-    cookie_btn = (
-        page.get_by_role("button", name="Continuer sans accepter")
-        .or_(page.get_by_role("button", name="Tout refuser"))
-        .or_(page.get_by_role("button", name="Refuser"))
-        .or_(page.get_by_role("button", name="Je refuse"))
-        .or_(page.get_by_role("button", name="Decline"))
+    # cookie_btn = (
+    #     page.get_by_role("button", name="Continuer sans accepter")
+    #     .or_(page.get_by_role("button", name="Tout refuser"))
+    #     .or_(page.get_by_role("button", name="Refuser"))
+    #     .or_(page.get_by_role("button", name="Je refuse"))
+    #     .or_(page.get_by_role("button", name="Decline"))
+    # )
+    cookie_btn = page.locator(
+    "button:has-text('Continuer sans accepter'), "
+    "a:has-text('Continuer sans accepter'), "
+    "button:has-text('Tout refuser'), "
+    "a:has-text('Tout refuser')"
     )
+    
     if cookie_btn.count() > 0:
         logger.info("Found cookie button")
         cookie_btn.first.click()

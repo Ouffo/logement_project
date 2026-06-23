@@ -2,6 +2,7 @@ from save_listings import save_listings
 from extract_listings import extract_all_listings
 from src.ingestion.sources.bienici_source import BieniciSource
 from src.ingestion.sources.leboncoin_source import LeboncoinSource
+from src.ingestion.sources.seloger_source import SeLogerSource
 from src.ingestion.sources.pap_source import PapSource
 from src.storage.repository import get_listings_to_enrich
 from src.storage.db import SessionLocal
@@ -12,9 +13,10 @@ def daily_pipeline():
     session = SessionLocal()
 
     sources = [
-        PapSource(),
-        LeboncoinSource(),
-        BieniciSource(),
+        #PapSource(),
+        #LeboncoinSource(),
+        #BieniciSource(),
+        SeLogerSource(),
     ]
 
     try:

@@ -6,6 +6,7 @@ from src.utils.logger import logger
 from src.utils.scrapping import get_next_page_url
 from src.processing.parsers import parse_french_posted_at, parse_price, parse_surface
 from .base import RentalListingSource
+from src.storage.repository import clean_htmls
 from src.ingestion.browser_client import (
     browser_context,
     open_page,
@@ -545,6 +546,7 @@ class LeboncoinSource(RentalListingSource):
         self.max_listings = max_listings
 
     def fetch_html(self):
+        clean_htmls(self.storage_path)
         html_pages = []
 
         with browser_context() as context:

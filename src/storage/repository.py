@@ -1,5 +1,6 @@
 from pathlib import Path
 from sqlalchemy.orm import Session
+from src.utils.logger import logger
 from src.storage.models import RentalListing
 from src.ingestion.sources.base import RentalListingSource
 from src.storage.orm_models import RentalListingORM
@@ -121,3 +122,18 @@ def get_listings_to_enrich(session, source_name: str) -> list[RentalListingORM]:
         .filter(RentalListingORM.details_fetched_at == None)
         .all()
     )
+
+def clean_htmls(path: str):
+    folder = Path(path)
+
+    if not folder.exists():
+        folder.mkdir(parents=True, exist_ok=True)
+
+    deleted_count = 0
+
+    for file_path in folder.glob("*.html"):
+        if file_path.is_file():
+            file_path.unlink()
+            deleted_count += 1
+
+    logger.info(f"Deleted {deleted_count} old HTML files from {folder}")

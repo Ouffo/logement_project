@@ -428,7 +428,7 @@ def render_card(row):
         </div>
     </div>
     """
-    return card
+    return "\n".join(line for line in card.splitlines() if line.strip())
 
 
 # ── Header ──────────────────────────────────────────────────────────────────

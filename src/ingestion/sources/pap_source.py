@@ -7,6 +7,7 @@ from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 from datetime import datetime, UTC
 from src.utils.logger import logger
+from src.storage.repository import clean_htmls
 from src.ingestion.browser_client import (
     browser_context,
     open_page,
@@ -307,6 +308,7 @@ class PapSource(RentalListingSource):
     parser = staticmethod(parse_pap_detail_html)
 
     def fetch_html(self):
+        clean_htmls(self.storage_path)
         html_pages = []
 
         with browser_context() as context:
