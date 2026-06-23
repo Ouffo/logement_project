@@ -1,4 +1,6 @@
 from pathlib import Path
+import hashlib
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -318,12 +320,21 @@ def load_listings() -> pd.DataFrame:
                     "energy_class": l.energy_class,
                     "construction_year": l.construction_year,
                     "posted_at": l.posted_at,
+                    "description": l.description,
+                    "collected_at": l.collected_at,
                 }
                 for l in listings
             ]
         )
     finally:
         session.close()
+
+
+def _description_fingerprint(text) -> str | None:
+    if not text or not isinstance(text, str):
+        return None
+    normalized = re.sub(r'\s+', ' ', text.lower().strip())[:200]
+    return hashlib.md5(normalized.encode()).hexdigest()
 
 
 _ENERGY_CLASSES = ["A", "B", "C", "D", "E", "F", "G"]
@@ -443,6 +454,19 @@ df = load_listings()
 if df.empty:
     st.warning("Aucune annonce en base pour l'instant.")
     st.stop()
+
+# ── Deduplication ────────────────────────────────────────────────────────────
+df["_desc_fp"] = df["description"].apply(_description_fingerprint)
+has_fp = df["_desc_fp"].notna()
+df_with_fp = (
+    df[has_fp]
+    .sort_values("collected_at", ascending=False)
+    .drop_duplicates(subset=["_desc_fp"], keep="first")
+)
+df = pd.concat([df_with_fp, df[~has_fp]], ignore_index=True)
+df = df.sort_values("score", ascending=False, na_position="last").drop(
+    columns=["_desc_fp", "description", "collected_at"]
+)
 
 # ── Filters ──────────────────────────────────────────────────────────────────
 with st.container():
