@@ -123,6 +123,16 @@ def get_listings_to_enrich(session, source_name: str) -> list[RentalListingORM]:
         .all()
     )
 
+def get_listings_to_score_image(session) -> list[RentalListingORM]:
+    return (
+        session.query(RentalListingORM)
+        .filter(RentalListingORM.is_active == True)
+        .filter(RentalListingORM.image_url != None)
+        .filter(RentalListingORM.image_scored_at == None)
+        .all()
+    )
+
+
 def clean_htmls(path: str):
     folder = Path(path)
 

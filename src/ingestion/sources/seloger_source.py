@@ -210,7 +210,7 @@ def parse_seloger_card(card) -> RentalListing | None:
     return RentalListing(
         source="seloger",
         source_id=source_id,
-        url=HttpUrl(url),
+        url=HttpUrl(url) if url else None,
         title=title,
         description=description,
         city="Paris",
@@ -226,7 +226,6 @@ def parse_seloger_card(card) -> RentalListing | None:
         parking= "parking" in (description or full_text or "").lower(),
         quiet= "calme" in (description or full_text or "").lower(),
         energy_class= parse_energy_class(card),
-        available_at= parse_available_at(keyfacts or full_text),
         posted_at=None,
         image_url=image_url,
     )
@@ -320,11 +319,11 @@ class SeLogerSource(RentalListingSource):
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(html)
 
-    def fetch_detail_htmls(self, _: list[RentalListingORM]):
+    def fetch_detail_htmls(self, listings: list[RentalListingORM]):
         return []
     
     def enrich_listing(
         self, 
-        _: RentalListingORM,
-        __: str,):
+        listing: RentalListingORM,
+        html: str,):
         return None

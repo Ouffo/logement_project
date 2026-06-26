@@ -35,4 +35,6 @@ class RentalListing(BaseModel):
     energy_class: str | None = None
     details_fetched_at: datetime | None = None
 
+    image_score: float | None = None
+
     relevance_score: Optional[float] = None

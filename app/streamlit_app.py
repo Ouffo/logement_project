@@ -322,6 +322,7 @@ def load_listings() -> pd.DataFrame:
                     "posted_at": l.posted_at,
                     "description": l.description,
                     "collected_at": l.collected_at,
+                    "last_seen_at": l.last_seen_at,
                 }
                 for l in listings
             ]
@@ -443,10 +444,12 @@ def render_card(row):
 
 
 # ── Header ──────────────────────────────────────────────────────────────────
-st.markdown(
-    '<div class="app-header"><div class="app-logo">bien<span>paris</span></div></div>',
-    unsafe_allow_html=True,
-)
+_h1, _h2 = st.columns([3, 2])
+with _h1:
+    st.markdown(
+        '<div class="app-header"><div class="app-logo">bien<span>paris</span></div></div>',
+        unsafe_allow_html=True,
+    )
 
 # ── Data ─────────────────────────────────────────────────────────────────────
 df = load_listings()
@@ -454,6 +457,16 @@ df = load_listings()
 if df.empty:
     st.warning("Aucune annonce en base pour l'instant.")
     st.stop()
+
+# ── Last update timestamp ─────────────────────────────────────────────────────
+_last_update = df["last_seen_at"].dropna().max()
+with _h2:
+    if pd.notna(_last_update):
+        _last_update_str = pd.Timestamp(_last_update).strftime("%d/%m/%Y à %H:%M")
+        st.markdown(
+            f'<div style="text-align:right;color:#9ca3af;font-size:0.8rem;padding-top:1.1rem;">Dernière mise à jour : {_last_update_str}</div>',
+            unsafe_allow_html=True,
+        )
 
 # ── Deduplication ────────────────────────────────────────────────────────────
 df["_desc_fp"] = df["description"].apply(_description_fingerprint)
@@ -465,7 +478,7 @@ df_with_fp = (
 )
 df = pd.concat([df_with_fp, df[~has_fp]], ignore_index=True)
 df = df.sort_values("score", ascending=False, na_position="last").drop(
-    columns=["_desc_fp", "description", "collected_at"]
+    columns=["_desc_fp", "description", "collected_at", "last_seen_at"]
 )
 
 # ── Filters ──────────────────────────────────────────────────────────────────

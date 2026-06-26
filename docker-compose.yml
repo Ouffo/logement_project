@@ -1,19 +1,29 @@
 services:
   postgres:
     image: postgres:16
-
     container_name: logement_postgres
-
     environment:
       POSTGRES_USER: logement
       POSTGRES_PASSWORD: logement
       POSTGRES_DB: logement_db
-
     ports:
       - "5432:5432"
-
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  pipeline:
+    build: .
+    container_name: logement_pipeline
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: >
+      bash -lc "Xvfb :99 -screen 0 1280x720x24 &
+      DISPLAY=:99 python -u pipelines/daily_pipelines.py"
 
 volumes:
   postgres_data:

@@ -8,8 +8,8 @@ from src.storage.models import RentalListing
 class RentalListingSource(ABC):
     name: str
     search_url: str
-    storage_path: str | None = None
-    detail_storage_path: str | None = None
+    storage_path: str = ""
+    detail_storage_path: str = ""
     parser: Callable[[str], list[RentalListing]] | None = None
     detail_parser: Callable[[str], RentalListing] | None = None
 
@@ -17,10 +17,17 @@ class RentalListingSource(ABC):
     def fetch_html(self):
         pass
 
-    def fetch_detail_htmls(self, _: list[RentalListingORM],) -> list[tuple[RentalListingORM, str]]:
+    def fetch_detail_htmls(
+        self, 
+        listings: list[RentalListingORM],
+    ) -> list[tuple[RentalListingORM, str]]:
         pass
 
-    def enrich_listing(self):
+    def enrich_listing(
+        self,
+        listing: RentalListingORM,
+        html: str,
+    ) -> None:
         pass
 
 @dataclass
