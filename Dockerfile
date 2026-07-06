@@ -8,4 +8,9 @@ COPY . .
 
 ENV PYTHONPATH=/app
 
-CMD ["xvfb-run", "-a", "python", "pipelines/daily_pipelines.py"]
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["./entrypoint.sh"]
+
+CMD ["python", "-u", "pipelines/daily_pipelines.py"]

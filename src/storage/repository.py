@@ -69,11 +69,16 @@ def get_top_listings(
     )
 
 def mark_missing_listings_inactive(session, source_name, latest_listings):
+    if not latest_listings:
+        logger.warning(f"No listings fetched for {source_name}, skipping inactivation to avoid data loss")
+        return
+
     latest_ids = {listing.source_id for listing in latest_listings}
 
     db_listings = (
         session.query(RentalListingORM)
         .filter(RentalListingORM.source == source_name)
+        .filter(RentalListingORM.is_active == True)
         .all()
     )
 

@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.pool import NullPool
 
 load_dotenv()
 
@@ -23,7 +24,7 @@ if DATABASE_URL is None:
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
+    poolclass=NullPool,
     connect_args={"options": "-c lock_timeout=30s -c statement_timeout=60s"},
 )
 
