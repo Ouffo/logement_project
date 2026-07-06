@@ -51,8 +51,8 @@ services:
     command: >
       bash -c "airflow db migrate &&
       airflow users create
-      --username ouffo_airflow
-      --password karrouma0314
+      --username ${AIRFLOW_USERNAME}
+      --password ${AIRFLOW_PASSWORD}
       --firstname Hugo
       --lastname Fujimoto
       --role Admin
