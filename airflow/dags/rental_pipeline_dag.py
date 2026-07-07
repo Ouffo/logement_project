@@ -34,6 +34,9 @@ default_args = {
     "owner": "ouffo",
     "retries": 2,
     "retry_delay": timedelta(minutes=5),
+    "email": [os.getenv("AIRFLOW_ALERT_EMAIL")],
+    "email_on_failure": True,
+    "email_on_retry": False,
 }
 
 

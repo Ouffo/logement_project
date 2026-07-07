@@ -66,9 +66,19 @@ services:
     ports:
       - "8080:8080"
     environment:
+      PROJECT_ROOT: ${PROJECT_ROOT}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
-      PROJECT_ROOT: ${PROJECT_ROOT}
+
+      AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST}
+      AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT}
+
+      AIRFLOW__SMTP__SMTP_STARTTLS: "True"
+      AIRFLOW__SMTP__SMTP_SSL: "False"
+
+      AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
+      AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_FROM}
     volumes:
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
@@ -82,9 +92,20 @@ services:
     depends_on:
       - airflow-postgres
     environment:
+      PROJECT_ROOT: ${PROJECT_ROOT}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
-      PROJECT_ROOT: ${PROJECT_ROOT}
+
+      AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST}
+      AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT}
+
+      AIRFLOW__SMTP__SMTP_STARTTLS: "True"
+      AIRFLOW__SMTP__SMTP_SSL: "False"
+
+      AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
+      AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_FROM}
+      
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
