@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from airflow import DAG
+from docker.types import Mount
 from airflow.providers.docker.operators.docker import DockerOperator
 
 SOURCE_NAMES = ["pap", "leboncoin", "bienici", "seloger"]
@@ -13,6 +14,18 @@ COMMON_DOCKER_ARGS = {
     "auto_remove": "success",
     "mount_tmp_dir": False,
     "execution_timeout": timedelta(hours=2),
+     "mounts": [
+        Mount(
+            source="/home/ubuntu/logement_project/data",
+            target="/app/data",
+            type="bind",
+        ),
+        Mount(
+            source="/home/ubuntu/logement_project/logs",
+            target="/app/logs",
+            type="bind",
+        ),
+    ],
 }
 
 
