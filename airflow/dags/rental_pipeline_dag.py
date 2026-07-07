@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta
-
+import os
 from airflow import DAG
 from docker.types import Mount
 from airflow.providers.docker.operators.docker import DockerOperator
 
 SOURCE_NAMES = ["pap", "leboncoin", "bienici", "seloger"]
 
+PROJECT_ROOT = os.environ["PROJECT_ROOT"]
 
 COMMON_DOCKER_ARGS = {
     "image": "logement_project-pipeline",
@@ -16,12 +17,12 @@ COMMON_DOCKER_ARGS = {
     "execution_timeout": timedelta(hours=2),
      "mounts": [
         Mount(
-            source="/home/ubuntu/logement_project/data",
+            source=f"{PROJECT_ROOT}/data",
             target="/app/data",
             type="bind",
         ),
         Mount(
-            source="/home/ubuntu/logement_project/logs",
+            source=f"{PROJECT_ROOT}/logs",
             target="/app/logs",
             type="bind",
         ),
