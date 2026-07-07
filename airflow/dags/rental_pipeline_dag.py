@@ -34,7 +34,7 @@ def pipeline_task(task_id: str, command: str) -> DockerOperator:
 with DAG(
     dag_id="rental_pipeline",
     start_date=datetime(2026, 1, 1),
-    schedule=None,
+    schedule="0 0,8,12,18 * * *",
     catchup=False,
     default_args=default_args,
     tags=["rental", "scraping"],
