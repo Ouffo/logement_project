@@ -71,8 +71,8 @@ with DAG(
             command=f"""
             python -u 
             pipelines/daily_pipelines.py 
-            --task fetch-source -
-            -source {source_name}
+            --task fetch-source 
+            --source {source_name}
             """,
         )
 
