@@ -92,9 +92,7 @@ def test_score_listing_image_strips_markdown_fences(monkeypatch):
     monkeypatch.setattr(
         image_scorer._client.messages,
         "create",
-        lambda **kw: _fake_anthropic_result(
-            '```json\n{"score": 8, "reason": "Correct"}\n```'
-        ),
+        lambda **kw: _fake_anthropic_result('```json\n{"score": 8, "reason": "Correct"}\n```'),
     )
 
     listing = _listing()

@@ -135,10 +135,7 @@ def test_parse_surface_m2_no_match():
 
 
 def test_parse_leboncoin_energy_dom_fallback():
-    html = (
-        '<div data-qa-id="criteria_item_energy_rate">'
-        "<span>Classe</span><span>C</span></div>"
-    )
+    html = '<div data-qa-id="criteria_item_energy_rate"><span>Classe</span><span>C</span></div>'
     assert parse_leboncoin_energy(html) == "C"
 
 

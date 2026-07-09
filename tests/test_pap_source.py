@@ -141,9 +141,7 @@ def test_parse_pap_posted_at_from_real_text():
 
 
 def test_parse_pap_posted_at_unaccented_month():
-    assert parse_pap_posted_at("Mise à jour le 3 fevrier 2026") == datetime(
-        2026, 2, 3, tzinfo=UTC
-    )
+    assert parse_pap_posted_at("Mise à jour le 3 fevrier 2026") == datetime(2026, 2, 3, tzinfo=UTC)
 
 
 def test_parse_pap_posted_at_no_match():

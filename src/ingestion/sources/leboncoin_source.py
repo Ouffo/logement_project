@@ -104,6 +104,7 @@ def extract_subject_by_source_id(html: str) -> dict[str, str]:
 
     return {source_id: subject for source_id, subject in pattern.findall(html)}
 
+
 def parse_property_type(text: str) -> str | None:
     match = re.search(
         r"\b(Appartement|Studio|Loft|Duplex)\b",
@@ -136,6 +137,7 @@ def parse_surface_m2(text: str) -> float | None:
 
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
 
+
 def parse_leboncoin_energy(html: str) -> str | None:
     # 1. Le plus fiable : JSON embarqué Leboncoin
     patterns = [
@@ -162,6 +164,7 @@ def parse_leboncoin_energy(html: str) -> str | None:
                 return value
 
     return None
+
 
 def parse_leboncoin_construction_year(html: str) -> int | None:
     soup = BeautifulSoup(html, "html.parser")
