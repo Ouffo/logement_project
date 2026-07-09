@@ -31,12 +31,17 @@ COMMON_DOCKER_ARGS = {
     ],
 }
 
+ALERT_EMAIL = os.getenv("AIRFLOW_ALERT_EMAIL")
+
+if not ALERT_EMAIL:
+    raise RuntimeError("AIRFLOW_ALERT_EMAIL is not defined")
+
 
 default_args = {
     "owner": "ouffo",
     "retries": 2,
     "retry_delay": timedelta(minutes=5),
-    "email": [os.getenv("AIRFLOW_ALERT_EMAIL")],
+    "email": [ALERT_EMAIL],
     "email_on_failure": True,
     "email_on_retry": False,
 }

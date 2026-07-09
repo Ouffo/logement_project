@@ -70,6 +70,7 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
 
+      AIRFLOW_ALERT_EMAIL: ${AIRFLOW_ALERT_EMAIL}
       AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST}
       AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT}
 
@@ -96,6 +97,7 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
 
+      AIRFLOW_ALERT_EMAIL: ${AIRFLOW_ALERT_EMAIL}
       AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST}
       AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT}
 
