@@ -7,11 +7,11 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import or_
 
-from src.storage.db import SessionLocal
-from src.storage.orm_models import RentalListingORM
-
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT))
+
+from src.storage.db import SessionLocal  # noqa: E402
+from src.storage.orm_models import RentalListingORM  # noqa: E402
 
 st.set_page_config(
     page_title="Logements Paris",

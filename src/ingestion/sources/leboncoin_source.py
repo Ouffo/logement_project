@@ -11,7 +11,7 @@ from src.ingestion.browser_client import (
     get_rendered_html,
     open_page,
 )
-from src.processing.parsers import parse_french_posted_at, parse_price, parse_surface
+from src.processing.parsers import parse_price, parse_surface
 from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 from src.storage.repository import clean_htmls
