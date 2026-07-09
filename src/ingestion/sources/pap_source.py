@@ -1,20 +1,22 @@
-from pathlib import Path
 import re
+from datetime import UTC, datetime
+from pathlib import Path
+
 from bs4 import BeautifulSoup
+
+from src.ingestion.browser_client import (
+    browser_context,
+    close_page,
+    get_rendered_html,
+    open_page,
+)
 from src.ingestion.sources.base import RentalListingSource
 from src.processing.parsers import parse_price, parse_surface
 from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
-from datetime import datetime, UTC
-from src.utils.logger import logger
 from src.storage.repository import clean_htmls
-from src.ingestion.browser_client import (
-    browser_context,
-    open_page,
-    get_rendered_html,
-    close_page,
-)
-from src.utils.scrapping import combine_htmls, simulate_scroll, extract_body_content
+from src.utils.logger import logger
+from src.utils.scrapping import combine_htmls, extract_body_content, simulate_scroll
 
 
 def parse_pap_html(html: str) -> list[RentalListing]:
@@ -27,11 +29,12 @@ def parse_pap_html(html: str) -> list[RentalListing]:
         title_el = item.select_one(".item-title")
         location_el = item.select_one(".h1")
 
-        if not (
-            price_el
-            and title_el
-            and location_el
-        ) or not price_el.text.strip() or not title_el.text.strip() or not location_el.text.strip():
+        if (
+            not (price_el and title_el and location_el)
+            or not price_el.text.strip()
+            or not title_el.text.strip()
+            or not location_el.text.strip()
+        ):
             logger.warning("Skipping malformed listing")
             continue
 
@@ -39,10 +42,7 @@ def parse_pap_html(html: str) -> list[RentalListing]:
         location = location_el.get_text(strip=True)
         description = item.select_one(".item-description").get_text(" ", strip=True)
 
-        tags = [
-            tag.get_text(" ", strip=True)
-            for tag in item.select(".item-tags li")
-        ]
+        tags = [tag.get_text(" ", strip=True) for tag in item.select(".item-tags li")]
 
         rooms = None
         bedrooms = None
@@ -128,10 +128,9 @@ def parse_pap_posted_at(text: str) -> datetime | None:
 def parse_pap_source_id(url: str) -> str:
     return url.rstrip("/").split("-")[-1]
 
+
 def parse_pap_energy_class(section) -> str | None:
-    text_node = section.find(
-        string=lambda s: s and "Classe énergie" in s
-    )
+    text_node = section.find(string=lambda s: s and "Classe énergie" in s)
 
     if not text_node:
         return None
@@ -176,10 +175,7 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
 
         price_eur = parse_price(price_el.get_text(" ", strip=True))
 
-        strong_values = [
-            el.get_text(" ", strip=True)
-            for el in section.select("strong")
-        ]
+        strong_values = [el.get_text(" ", strip=True) for el in section.select("strong")]
 
         rooms = None
         bedrooms = None
@@ -200,14 +196,10 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
             continue
 
         description_el = section.select_one("div p")
-        description = (
-            description_el.get_text("\n", strip=True)
-            if description_el
-            else None
-        )
+        description = description_el.get_text("\n", strip=True) if description_el else None
 
         energy_class = parse_pap_energy_class(section)
-        if energy_class == None:
+        if energy_class is None:
             logger.info(f"energy class None for {url}")
 
         image_el = section.select_one('img[src^="https://cdn.pap.fr"]')
@@ -240,20 +232,18 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
                 quiet="calme" in full_text.lower(),
                 posted_at=posted_at,
                 image_url=image_url,
-                energy_class=energy_class
+                energy_class=energy_class,
             )
         )
 
     return listings
 
+
 def merge_pap_list_and_detail(
     list_listings: list[RentalListing],
     detail_listings: list[RentalListing],
 ) -> list[RentalListing]:
-    list_by_id = {
-        listing.source_id: listing
-        for listing in list_listings
-    }
+    list_by_id = {listing.source_id: listing for listing in list_listings}
 
     merged = []
 
@@ -281,15 +271,9 @@ def merge_pap_list_and_detail(
                 surface_m2=detail.surface_m2 or base.surface_m2,
                 rooms=detail.rooms or base.rooms,
                 bedrooms=detail.bedrooms or base.bedrooms,
-                furnished=detail.furnished
-                if detail.furnished is not None
-                else base.furnished,
-                parking=detail.parking
-                if detail.parking is not None
-                else base.parking,
-                quiet=detail.quiet
-                if detail.quiet is not None
-                else base.quiet,
+                furnished=detail.furnished if detail.furnished is not None else base.furnished,
+                parking=detail.parking if detail.parking is not None else base.parking,
+                quiet=detail.quiet if detail.quiet is not None else base.quiet,
                 posted_at=detail.posted_at or base.posted_at,
                 collected_at=base.collected_at,
                 relevance_score=base.relevance_score,
@@ -337,9 +321,10 @@ class PapSource(RentalListingSource):
 
     def fetch_detail_htmls(self, _: list[RentalListingORM]):
         return []
-    
+
     def enrich_listing(
-        self, 
+        self,
         _: RentalListingORM,
-        __: str,):
+        __: str,
+    ):
         return None

@@ -1,7 +1,9 @@
-from datetime import datetime, timedelta
 import os
-from airflow import DAG
+from datetime import datetime, timedelta
+
 from docker.types import Mount
+
+from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
 
 SOURCE_NAMES = ["pap", "leboncoin", "bienici", "seloger"]
@@ -15,7 +17,7 @@ COMMON_DOCKER_ARGS = {
     "auto_remove": "success",
     "mount_tmp_dir": False,
     "execution_timeout": timedelta(hours=2),
-     "mounts": [
+    "mounts": [
         Mount(
             source=f"{PROJECT_ROOT}/data",
             target="/app/data",
@@ -56,23 +58,37 @@ with DAG(
     default_args=default_args,
     tags=["rental", "scraping"],
 ) as dag:
-
     source_enrich_tasks = []
 
     for source_name in SOURCE_NAMES:
         fetch = pipeline_task(
             task_id=f"fetch_{source_name}",
-            command=f"python -u pipelines/daily_pipelines.py --task fetch-source --source {source_name}",
+            command=f"""
+            python -u 
+            pipelines/daily_pipelines.py 
+            --task fetch-source -
+            -source {source_name}
+            """,
         )
 
         extract_save = pipeline_task(
             task_id=f"extract_save_{source_name}",
-            command=f"python -u pipelines/daily_pipelines.py --task extract-save-source --source {source_name}",
+            command=f"""
+            python -u 
+            pipelines/daily_pipelines.py 
+            --task extract-save-source 
+            --source {source_name}
+            """,
         )
 
         enrich = pipeline_task(
             task_id=f"enrich_{source_name}",
-            command=f"python -u pipelines/daily_pipelines.py --task enrich-source --source {source_name}",
+            command=f"""
+            python -u 
+            pipelines/daily_pipelines.py 
+            --task enrich-source 
+            --source {source_name}
+            """,
         )
 
         fetch >> extract_save >> enrich

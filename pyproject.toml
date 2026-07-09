@@ -1,15 +1,31 @@
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "logement-project"
-version = "0.1.0"
-requires-python = ">=3.12"
-dependencies = [
-    "pydantic>=2.0",
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [
+    ".venv",
+    "__pycache__",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # bugbear
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = "true"
+skip_covered = "true"

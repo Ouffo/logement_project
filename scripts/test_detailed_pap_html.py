@@ -1,9 +1,7 @@
-
-
 from src.ingestion.browser_client import browser_context, close_page, get_rendered_html, open_page
-from src.utils.scrapping import extract_body_content, simulate_scroll
-from src.utils.scrapping import combine_htmls
 from src.ingestion.sources.pap_source import parse_pap_html
+from src.utils.scrapping import combine_htmls, extract_body_content, simulate_scroll
+
 
 def test_detailed_pap_html():
     html_pages = []
@@ -26,8 +24,9 @@ def test_detailed_pap_html():
 
     combined_html = combine_htmls(html_pages)
 
-    with open(f"data/raw/test_pap_detailed.html", "w", encoding="utf-8") as file:
+    with open("data/raw/test_pap_detailed.html", "w", encoding="utf-8") as file:
         file.write(combined_html)
+
 
 if __name__ == "__main__":
     test_detailed_pap_html()

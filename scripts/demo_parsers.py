@@ -1,5 +1,6 @@
-from src.processing.parsers import (parse_price, parse_surface)
+from src.processing.parsers import parse_price, parse_surface
 from src.utils.logger import logger
+
 
 def demo_parsing():
     price_str = "1,250 €"
@@ -10,6 +11,7 @@ def demo_parsing():
 
     logger.info(f"Parsed price: {price} EUR")
     logger.info(f"Parsed surface: {surface} m²")
+
 
 if __name__ == "__main__":
     demo_parsing()

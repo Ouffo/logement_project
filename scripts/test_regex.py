@@ -17,9 +17,10 @@ Vendeur professionnel.
 
 subject = "Agréable Studio meublé idéalement situé"
 
+
 def test_detail_regex():
     details_match = re.search(
-    r"""
+        r"""
     (Appartement|Studio|Loft|Duplex)      # type
     \s*·?\s*                              # séparateur optionnel
     (?:
@@ -33,6 +34,7 @@ def test_detail_regex():
 
     print(details_match.groups() if details_match else None)
 
+
 def test_description_regex():
     subject = "Recherche d’un appartement"
     description_match = re.search(
@@ -43,6 +45,7 @@ def test_description_regex():
 
     print(description_match.groups() if description_match else None)
 
+
 if __name__ == "__main__":
     test_detail_regex()
-    #test_description_regex()
+    # test_description_regex()

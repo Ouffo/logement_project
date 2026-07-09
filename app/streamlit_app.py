@@ -1,17 +1,17 @@
-from pathlib import Path
 import hashlib
 import re
 import sys
-
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.append(str(ROOT))
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 from sqlalchemy import or_
+
 from src.storage.db import SessionLocal
 from src.storage.orm_models import RentalListingORM
 
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT))
 
 st.set_page_config(
     page_title="Logements Paris",
@@ -290,7 +290,7 @@ def load_listings() -> pd.DataFrame:
     try:
         listings = (
             session.query(RentalListingORM)
-            .filter(RentalListingORM.is_active == True)
+            .filter(RentalListingORM.is_active)
             .filter(~RentalListingORM.title.ilike("%cherche%"))
             .filter(
                 or_(
@@ -304,27 +304,27 @@ def load_listings() -> pd.DataFrame:
         return pd.DataFrame(
             [
                 {
-                    "source": l.source,
-                    "title": l.title,
-                    "postal_code": l.postal_code,
-                    "price_eur": l.price_eur,
-                    "surface_m2": l.surface_m2,
-                    "rooms": l.rooms,
-                    "bedrooms": l.bedrooms,
-                    "furnished": l.furnished,
-                    "parking": l.parking,
-                    "quiet": l.quiet,
-                    "score": l.relevance_score,
-                    "url": l.url,
-                    "image_url": l.image_url,
-                    "energy_class": l.energy_class,
-                    "construction_year": l.construction_year,
-                    "posted_at": l.posted_at,
-                    "description": l.description,
-                    "collected_at": l.collected_at,
-                    "last_seen_at": l.last_seen_at,
+                    "source": listing.source,
+                    "title": listing.title,
+                    "postal_code": listing.postal_code,
+                    "price_eur": listing.price_eur,
+                    "surface_m2": listing.surface_m2,
+                    "rooms": listing.rooms,
+                    "bedrooms": listing.bedrooms,
+                    "furnished": listing.furnished,
+                    "parking": listing.parking,
+                    "quiet": listing.quiet,
+                    "score": listing.relevance_score,
+                    "url": listing.url,
+                    "image_url": listing.image_url,
+                    "energy_class": listing.energy_class,
+                    "construction_year": listing.construction_year,
+                    "posted_at": listing.posted_at,
+                    "description": listing.description,
+                    "collected_at": listing.collected_at,
+                    "last_seen_at": listing.last_seen_at,
                 }
-                for l in listings
+                for listing in listings
             ]
         )
     finally:
@@ -334,7 +334,7 @@ def load_listings() -> pd.DataFrame:
 def _description_fingerprint(text) -> str | None:
     if not text or not isinstance(text, str):
         return None
-    normalized = re.sub(r'\s+', ' ', text.lower().strip())[:200]
+    normalized = re.sub(r"\s+", " ", text.lower().strip())[:200]
     return hashlib.md5(normalized.encode()).hexdigest()
 
 
@@ -349,7 +349,11 @@ def render_energy_label(energy_class: str) -> str:
         f'<span class="energy-box energy-{c}{"  active" if c == ec else ""}">{c}</span>'
         for c in _ENERGY_CLASSES
     )
-    return f'<div class="energy-label"><span class="energy-label-title">Classe énergie</span>{boxes}</div>'
+    return f"""
+    <div class="energy-label">
+    <span class="energy-label-title">
+    Classe énergie</span>{boxes}</div>
+    """
 
 
 def score_class(score):
@@ -382,7 +386,9 @@ def render_card(row):
 
     price_str = f"{int(price)} €" if pd.notna(price) else "— €"
     surface_str = f"{int(surface)} m²" if pd.notna(surface) else "— m²"
-    rooms_str = f"{int(rooms)} pièce{'s' if rooms and rooms > 1 else ''}" if pd.notna(rooms) else "—"
+    rooms_str = (
+        f"{int(rooms)} pièce{'s' if rooms and rooms > 1 else ''}" if pd.notna(rooms) else "—"
+    )
 
     tags_html = ""
     if furnished:
@@ -464,7 +470,10 @@ with _h2:
     if pd.notna(_last_update):
         _last_update_str = pd.Timestamp(_last_update).strftime("%d/%m/%Y à %H:%M")
         st.markdown(
-            f'<div style="text-align:right;color:#9ca3af;font-size:0.8rem;padding-top:1.1rem;">Dernière mise à jour : {_last_update_str}</div>',
+            f"""
+            <div style="text-align:right;color:#9ca3af;font-size:0.8rem;padding-top:1.1rem;">
+            Dernière mise à jour : {_last_update_str}</div>
+            """,
             unsafe_allow_html=True,
         )
 
@@ -531,7 +540,13 @@ if sort_by_date:
 
 # ── Results ──────────────────────────────────────────────────────────────────
 st.markdown(
-    f'<div class="results-count"><strong>{len(filtered)}</strong> annonce{"s" if len(filtered) != 1 else ""} trouvée{"s" if len(filtered) != 1 else ""}</div>',
+    f"""
+    <div class="results-count">
+    <strong>{len(filtered)}</strong> 
+    annonce{"s" if len(filtered) != 1 else ""} 
+    trouvée{"s" if len(filtered) != 1 else ""}
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 

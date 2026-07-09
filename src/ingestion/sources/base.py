@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
-from src.storage.orm_models import RentalListingORM
+
 from src.storage.models import RentalListing
+from src.storage.orm_models import RentalListingORM
 
 
 class RentalListingSource(ABC):
@@ -17,12 +18,14 @@ class RentalListingSource(ABC):
     def fetch_html(self):
         pass
 
+    @abstractmethod
     def fetch_detail_htmls(
-        self, 
+        self,
         listings: list[RentalListingORM],
     ) -> list[tuple[RentalListingORM, str]]:
         pass
 
+    @abstractmethod
     def enrich_listing(
         self,
         listing: RentalListingORM,
@@ -30,8 +33,8 @@ class RentalListingSource(ABC):
     ) -> None:
         pass
 
+
 @dataclass
 class Source:
     name: str
     base_url: str
-

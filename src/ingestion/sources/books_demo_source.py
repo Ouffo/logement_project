@@ -1,22 +1,18 @@
-from bs4 import BeautifulSoup
 import time
+
+from bs4 import BeautifulSoup
+
 from src.ingestion.http_client import fetch_html
 from src.utils.logger import logger
 
-
-BASE_URL = (
-    "https://books.toscrape.com/catalogue/"
-)
+BASE_URL = "https://books.toscrape.com/catalogue/"
 
 
 def fetch_books_page(
     page_number: int,
 ) -> list[dict]:
 
-    url = (
-        BASE_URL +
-        f"page-{page_number}.html"
-    )
+    url = BASE_URL + f"page-{page_number}.html"
 
     html = fetch_html(url)
 
@@ -27,29 +23,13 @@ def fetch_books_page(
 
     books = []
 
-    for book_el in soup.select(
-        ".product_pod"
-    ):
-
+    for book_el in soup.select(".product_pod"):
         try:
+            title = book_el.select_one("h3 a").get("title")
 
-            title = (
-                book_el
-                .select_one("h3 a")
-                .get("title")
-            )
+            price = book_el.select_one(".price_color").get_text(strip=True)
 
-            price = (
-                book_el
-                .select_one(".price_color")
-                .get_text(strip=True)
-            )
-
-            availability = (
-                book_el
-                .select_one(".availability")
-                .get_text(strip=True)
-            )
+            availability = book_el.select_one(".availability").get_text(strip=True)
 
             books.append(
                 {
@@ -60,15 +40,9 @@ def fetch_books_page(
             )
 
         except Exception:
-            logger.exception(
-                "Failed parsing book"
-            )
+            logger.exception("Failed parsing book")
 
-    logger.info(
-        f"Fetched page "
-        f"{page_number} "
-        f"with {len(books)} books"
-    )
+    logger.info(f"Fetched page {page_number} with {len(books)} books")
 
     return books
 
@@ -83,19 +57,11 @@ def fetch_all_books(
         1,
         max_pages + 1,
     ):
+        books = fetch_books_page(page_number)
 
-        books = fetch_books_page(
-            page_number
-        )
-
-        all_books.extend(
-            books
-        )
+        all_books.extend(books)
         time.sleep(1)
 
-    logger.info(
-        f"Fetched total "
-        f"{len(all_books)} books"
-    )
+    logger.info(f"Fetched total {len(all_books)} books")
 
     return all_books

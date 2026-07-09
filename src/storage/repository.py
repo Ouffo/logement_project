@@ -1,24 +1,26 @@
-from pathlib import Path
-from sqlalchemy.orm import Session
-from src.utils.logger import logger
-from src.storage.models import RentalListing
-from src.ingestion.sources.base import RentalListingSource
-from src.storage.orm_models import RentalListingORM
 from datetime import UTC, datetime
+from pathlib import Path
+
+from sqlalchemy.orm import Session
+
+from src.ingestion.sources.base import RentalListingSource
+from src.storage.models import RentalListing
+from src.storage.orm_models import RentalListingORM
+from src.utils.logger import logger
 
 
 def save_listing(
     session: Session,
     listing: RentalListing,
 ) -> RentalListingORM:
-    
+
     now = datetime.now(UTC)
-    
+
     db_listing = (
         session.query(RentalListingORM)
         .filter(
             RentalListingORM.source == listing.source,
-            RentalListingORM.source_id == listing.source_id
+            RentalListingORM.source_id == listing.source_id,
         )
         .one_or_none()
     )
@@ -53,24 +55,25 @@ def save_listing(
     db_listing.details_fetched_at = listing.details_fetched_at
     db_listing.is_active = True
     db_listing.last_seen_at = now
-    
+
     return db_listing
 
-def get_top_listings(
-    session: Session,
-    limit: int = 10
-) -> list[RentalListingORM]:
 
-    return(
+def get_top_listings(session: Session, limit: int = 10) -> list[RentalListingORM]:
+
+    return (
         session.query(RentalListingORM)
         .order_by(RentalListingORM.relevance_score.desc())
         .limit(limit)
         .all()
     )
 
+
 def mark_missing_listings_inactive(session, source_name, latest_listings):
     if not latest_listings:
-        logger.warning(f"No listings fetched for {source_name}, skipping inactivation to avoid data loss")
+        logger.warning(
+            f"No listings fetched for {source_name}, skipping inactivation to avoid data loss"
+        )
         return
 
     latest_ids = {listing.source_id for listing in latest_listings}
@@ -78,13 +81,14 @@ def mark_missing_listings_inactive(session, source_name, latest_listings):
     db_listings = (
         session.query(RentalListingORM)
         .filter(RentalListingORM.source == source_name)
-        .filter(RentalListingORM.is_active == True)
+        .filter(RentalListingORM.is_active)
         .all()
     )
 
     for db_listing in db_listings:
         if db_listing.source_id not in latest_ids:
             db_listing.is_active = False
+
 
 def deduplicate_listings(listings):
     seen = set()
@@ -101,11 +105,12 @@ def deduplicate_listings(listings):
 
     return deduped
 
+
 def enrich_listings(
-    source: RentalListingSource, 
-    listings: list[RentalListingORM], 
+    source: RentalListingSource,
+    listings: list[RentalListingORM],
 ) -> None:
-    
+
     detail_htmls = source.fetch_detail_htmls(listings)
 
     if source.detail_storage_path is not None:
@@ -117,23 +122,24 @@ def enrich_listings(
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(html)
             source.enrich_listing(listing, html)
-        
+
 
 def get_listings_to_enrich(session, source_name: str) -> list[RentalListingORM]:
     return (
         session.query(RentalListingORM)
         .filter(RentalListingORM.source == source_name)
-        .filter(RentalListingORM.is_active == True)
-        .filter(RentalListingORM.details_fetched_at == None)
+        .filter(RentalListingORM.is_active)
+        .filter(RentalListingORM.details_fetched_at.is_(None))
         .all()
     )
+
 
 def get_listings_to_score_image(session) -> list[RentalListingORM]:
     return (
         session.query(RentalListingORM)
-        .filter(RentalListingORM.is_active == True)
-        .filter(RentalListingORM.image_url != None)
-        .filter(RentalListingORM.image_scored_at == None)
+        .filter(RentalListingORM.is_active)
+        .filter(RentalListingORM.image_url.is_not(None))
+        .filter(RentalListingORM.image_scored_at.is_(None))
         .all()
     )
 

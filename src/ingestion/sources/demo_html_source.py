@@ -1,7 +1,9 @@
-from src.storage.models import RentalListing
 from bs4 import BeautifulSoup
-from src.processing.parsers import (parse_price, parse_surface, parse_rooms)
+
+from src.processing.parsers import parse_price, parse_rooms, parse_surface
+from src.storage.models import RentalListing
 from src.utils.logger import logger
+
 
 def fetch_demo_html_source() -> RentalListing:
     # Simulate fetching data from an HTML source
@@ -34,7 +36,7 @@ def fetch_demo_html_source() -> RentalListing:
                 postal_code=postal_code,
                 furnished="meublé" in description.lower(),
                 parking="parking" in description.lower(),
-                quiet="calme" in description.lower()
+                quiet="calme" in description.lower(),
             )
 
             listings.append(listing)

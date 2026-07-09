@@ -1,10 +1,13 @@
+from pydantic import HttpUrl
+
 from src.storage.models import RentalListing
+
 
 def test_listing_model():
     listing = RentalListing(
         source="demo",
         source_id="123",
-        url="https://example.com/appartement-123",
+        url=HttpUrl("https://example.com/appartement-123"),
         title="Appartement meublé calme avec parking",
         price_eur=1100,
         surface_m2=28,

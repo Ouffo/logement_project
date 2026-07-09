@@ -1,15 +1,16 @@
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.operators.bash import BashOperator
-from airflow.providers.docker.operators.docker import DockerOperator
 from datetime import datetime
+
+from airflow import DAG
+from airflow.operators.bash import BashOperator
 
 
 def hello():
     print("Hello from Airflow!")
 
+
 def goodbye():
     print("Goodbye from Airflow!")
+
 
 with DAG(
     dag_id="hello_world",
@@ -17,7 +18,6 @@ with DAG(
     schedule=None,
     catchup=False,
 ) as dag:
-
     env = BashOperator(
         task_id="env",
         bash_command="env",

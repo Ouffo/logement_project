@@ -1,40 +1,51 @@
-import os
 import argparse
-from datetime import datetime, UTC
-from save_listings import save_listings
+import os
+from datetime import UTC, datetime
+
 from extract_listings import extract_all_listings
+from save_listings import save_listings
+from sqlalchemy import text
+
+from src.ingestion.sources.base import RentalListingSource
 from src.ingestion.sources.bienici_source import BieniciSource
 from src.ingestion.sources.leboncoin_source import LeboncoinSource
-from src.ingestion.sources.seloger_source import SeLogerSource
-from src.ingestion.sources.base import RentalListingSource
 from src.ingestion.sources.pap_source import PapSource
-from src.storage.repository import get_listings_to_enrich, get_listings_to_score_image
-from src.storage.db import SessionLocal
-from src.storage.orm_models import RentalListingORM
-from src.storage.repository import deduplicate_listings, mark_missing_listings_inactive, enrich_listings
+from src.ingestion.sources.seloger_source import SeLogerSource
 from src.scoring.image_scorer import score_listing_image
 from src.scoring.ranker import compute_listing_score
-from src.utils.logger import logger
+from src.storage.db import SessionLocal
+from src.storage.orm_models import RentalListingORM
 from src.storage.registry import (
-    SOURCE_REGISTRY,
-    FETCH_SOURCE_LOCK_IDS,
-    EXTRACT_SAVE_SOURCE_LOCK_IDS,
     ENRICH_LOCK_IDS,
-    IMAGE_SCORING_LOCK_ID,
+    EXTRACT_SAVE_SOURCE_LOCK_IDS,
+    FETCH_SOURCE_LOCK_IDS,
     FINAL_SCORING_LOCK_ID,
+    IMAGE_SCORING_LOCK_ID,
+    SOURCE_REGISTRY,
 )
-from sqlalchemy import text
+from src.storage.repository import (
+    deduplicate_listings,
+    enrich_listings,
+    get_listings_to_enrich,
+    get_listings_to_score_image,
+    mark_missing_listings_inactive,
+)
+from src.utils.logger import logger
+
 
 def _lock_id(name: str) -> int:
     import hashlib
-    return int(hashlib.sha256(f"pipeline:{name}".encode()).hexdigest()[:15], 16) % (2 ** 62)
+
+    return int(hashlib.sha256(f"pipeline:{name}".encode()).hexdigest()[:15], 16) % (2**62)
+
 
 SOURCE_LOCK_IDS = {
-    "pap":       _lock_id("pap"),
+    "pap": _lock_id("pap"),
     "leboncoin": _lock_id("leboncoin"),
-    "bienici":   _lock_id("bienici"),
-    "seloger":   _lock_id("seloger"),
+    "bienici": _lock_id("bienici"),
+    "seloger": _lock_id("seloger"),
 }
+
 
 def daily_pipeline():
     sources = [
@@ -47,14 +58,14 @@ def daily_pipeline():
     start = datetime.now(UTC)
     success = False
 
-    try:        
+    try:
         logger.info("=" * 50)
         logger.info("Pipeline started")
         logger.info(f"Environment : {'Docker' if os.path.exists('/.dockerenv') else 'Local'}")
         logger.info(f"Date        : {start:%Y-%m-%d %H:%M:%S UTC}")
         logger.info("=" * 50)
         for source in sources:
-           run_source_pipeline(source)
+            run_source_pipeline(source)
 
         # Image scoring (all active listings not yet scored)
         run_image_scoring()
@@ -80,22 +91,25 @@ def daily_pipeline():
         logger.info(f"Duration: {duration}")
         logger.info("=" * 50)
 
+
 def fetch_source_html(source: RentalListingSource):
     session = SessionLocal()
-    lock_id = FETCH_SOURCE_LOCK_IDS["fetch_"+source.name]
-    acquired = False    
+    lock_id = FETCH_SOURCE_LOCK_IDS["fetch_" + source.name]
+    acquired = False
     success = False
 
     try:
         acquired = session.execute(
-            text("SELECT pg_try_advisory_lock(:lock_id)"), 
+            text("SELECT pg_try_advisory_lock(:lock_id)"),
             {"lock_id": lock_id},
         ).scalar()
 
         if not acquired:
-            logger.warning(f"Fetch {source.name} html already running — aborting to avoid lock conflicts")
+            logger.warning(
+                f"Fetch {source.name} html already running — aborting to avoid lock conflicts"
+            )
             return
-        
+
         logger.info("=" * 50)
         logger.info(f"Fetching {source.name} html...")
         logger.info("=" * 50)
@@ -120,26 +134,32 @@ def fetch_source_html(source: RentalListingSource):
         logger.info("=" * 50)
         if acquired:
             session.execute(
-                text("SELECT pg_advisory_unlock(:lock_id)"), 
-                {"lock_id":lock_id},
+                text("SELECT pg_advisory_unlock(:lock_id)"),
+                {"lock_id": lock_id},
             ).scalar()
         session.close()
 
+
 def extract_and_save_source_listings(source: RentalListingSource):
     session = SessionLocal()
-    lock_id = EXTRACT_SAVE_SOURCE_LOCK_IDS["extract_save_"+source.name]
+    lock_id = EXTRACT_SAVE_SOURCE_LOCK_IDS["extract_save_" + source.name]
     success = False
     acquired = False
 
     try:
         acquired = session.execute(
-            text("SELECT pg_try_advisory_lock(:lock_id)"), 
+            text("SELECT pg_try_advisory_lock(:lock_id)"),
             {"lock_id": lock_id},
         ).scalar()
 
         if not acquired:
-            logger.warning(f"Extract and save {source.name} listings already running — aborting to avoid lock conflicts")
-            return 
+            logger.warning(
+                f"""
+                Extract and save {source.name} listings already running 
+                — aborting to avoid lock conflicts
+                """
+            )
+            return
 
         # Extract listings from html
         listings = extract_all_listings(source)
@@ -171,26 +191,29 @@ def extract_and_save_source_listings(source: RentalListingSource):
         logger.info("=" * 50)
         if acquired:
             session.execute(
-                text("SELECT pg_advisory_unlock(:lock_id)"), 
-                {"lock_id":lock_id},
+                text("SELECT pg_advisory_unlock(:lock_id)"),
+                {"lock_id": lock_id},
             ).scalar()
 
         session.close()
 
+
 def run_enrich_listings(source: RentalListingSource):
     session = SessionLocal()
-    lock_id = ENRICH_LOCK_IDS["enrich_"+source.name]
+    lock_id = ENRICH_LOCK_IDS["enrich_" + source.name]
     success = False
     acquired = False
 
     try:
         acquired = session.execute(
-            text("SELECT pg_try_advisory_lock(:lock_id)"), 
+            text("SELECT pg_try_advisory_lock(:lock_id)"),
             {"lock_id": lock_id},
         ).scalar()
 
         if not acquired:
-            logger.warning(f"Enrich {source.name} listings already running — aborting to avoid lock conflicts")
+            logger.warning(
+                f"Enrich {source.name} listings already running — aborting to avoid lock conflicts"
+            )
             return
 
         logger.info("Getting listings to enrich")
@@ -209,7 +232,7 @@ def run_enrich_listings(source: RentalListingSource):
     except Exception:
         session.rollback()
         logger.exception(f"Enrich {source.name} listings ends with error")
-        raise   
+        raise
 
     finally:
         logger.info("=" * 50)
@@ -221,11 +244,11 @@ def run_enrich_listings(source: RentalListingSource):
         logger.info("=" * 50)
         if acquired:
             session.execute(
-                text("SELECT pg_advisory_unlock(:lock_id)"), 
-                {"lock_id":lock_id},
+                text("SELECT pg_advisory_unlock(:lock_id)"),
+                {"lock_id": lock_id},
             ).scalar()
 
-        session.close()        
+        session.close()
 
 
 def run_source_pipeline(source: RentalListingSource):
@@ -233,10 +256,13 @@ def run_source_pipeline(source: RentalListingSource):
     extract_and_save_source_listings(source)
     run_enrich_listings(source)
 
+
 def run_image_scoring():
     session = SessionLocal()
 
-    acquired = session.execute(text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": IMAGE_SCORING_LOCK_ID}).scalar()
+    acquired = session.execute(
+        text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": IMAGE_SCORING_LOCK_ID}
+    ).scalar()
     if not acquired:
         logger.warning("Image scoring already running — aborting to avoid lock conflicts")
         session.close()
@@ -256,24 +282,29 @@ def run_image_scoring():
 
     except Exception:
         session.rollback()
-        logger.exception(f"Score listings image ends with error")
+        logger.exception("Score listings image ends with error")
         raise
 
     finally:
         logger.info("=" * 50)
         if success:
-            logger.info(f"Score listings image finished successfully")
+            logger.info("Score listings image finished successfully")
         else:
-            logger.info(f"Score listings image finished with error")
+            logger.info("Score listings image finished with error")
 
         logger.info("=" * 50)
-        session.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": IMAGE_SCORING_LOCK_ID}).scalar()
+        session.execute(
+            text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": IMAGE_SCORING_LOCK_ID}
+        ).scalar()
         session.close()
+
 
 def run_final_scoring():
     session = SessionLocal()
 
-    acquired = session.execute(text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": FINAL_SCORING_LOCK_ID}).scalar()
+    acquired = session.execute(
+        text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": FINAL_SCORING_LOCK_ID}
+    ).scalar()
     if not acquired:
         logger.warning("Final scoring already running — aborting to avoid lock conflicts")
         session.close()
@@ -283,11 +314,7 @@ def run_final_scoring():
 
     try:
         # Rescore all active listings to include image scores
-        active_listings = (
-            session.query(RentalListingORM)
-            .filter(RentalListingORM.is_active == True)
-            .all()
-        )
+        active_listings = session.query(RentalListingORM).filter(RentalListingORM.is_active).all()
         for listing in active_listings:
             listing.relevance_score = compute_listing_score(listing)
         session.commit()
@@ -296,19 +323,22 @@ def run_final_scoring():
 
     except Exception:
         session.rollback()
-        logger.exception(f"Pipeline ends with error")
+        logger.exception("Pipeline ends with error")
         raise
-    
+
     finally:
         logger.info("=" * 50)
         if success:
-            logger.info(f"Final scoring finished successfully")
+            logger.info("Final scoring finished successfully")
         else:
-            logger.info(f"Final scoring ends with error")
+            logger.info("Final scoring ends with error")
 
         logger.info("=" * 50)
-        session.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": FINAL_SCORING_LOCK_ID}).scalar()
+        session.execute(
+            text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": FINAL_SCORING_LOCK_ID}
+        ).scalar()
         session.close()
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -361,6 +391,7 @@ def main():
 
     elif args.task == "all":
         daily_pipeline()
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, Float, Integer, String, Text, DateTime, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.storage.db import Base
@@ -46,7 +46,9 @@ class RentalListingORM(Base):
 
     construction_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     energy_class: Mapped[str | None] = mapped_column(String(5), nullable=True)
-    details_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    details_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     image_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     image_scored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -55,6 +57,5 @@ class RentalListingORM(Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     collected_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

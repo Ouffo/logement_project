@@ -1,11 +1,11 @@
 import base64
 import json
 import re
+from datetime import UTC, datetime
 
 import anthropic
 import httpx
 from anthropic.types import TextBlock
-from datetime import datetime, UTC
 
 from src.storage.orm_models import RentalListingORM
 from src.utils.logger import logger
@@ -19,7 +19,7 @@ _PROMPT = (
     "- Propreté et état général (0-5)\n"
     "- Sentiment d'espace et d'aération (0-5)\n"
     "Réponds uniquement en JSON sans markdown : "
-    '{\"score\": <entier 0-15>, \"reason\": \"<une phrase courte>\"}'
+    '{"score": <entier 0-15>, "reason": "<une phrase courte>"}'
 )
 
 
@@ -46,20 +46,22 @@ def score_listing_image(listing: RentalListingORM) -> None:
         result = _client.messages.create(
             model="claude-haiku-4-5",
             max_tokens=100,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": image_data,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": image_data,
+                            },
                         },
-                    },
-                    {"type": "text", "text": _PROMPT},
-                ],
-            }],
+                        {"type": "text", "text": _PROMPT},
+                    ],
+                }
+            ],
         )
 
         block = result.content[0]
@@ -67,13 +69,15 @@ def score_listing_image(listing: RentalListingORM) -> None:
             listing.image_score = None
             return
         raw = block.text.strip()
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
         if not match:
             listing.image_score = None
             return
         data = json.loads(match.group())
         listing.image_score = float(data["score"])
-        logger.info(f"[{listing.source_id}] image_score={listing.image_score}/15 — {data['reason']}")
+        logger.info(
+            f"[{listing.source_id}] image_score={listing.image_score}/15 — {data['reason']}"
+        )
 
     except Exception:
         logger.exception(f"Failed to score image for listing {listing.source_id}")

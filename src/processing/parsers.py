@@ -1,17 +1,30 @@
 import re
 from datetime import UTC, datetime, timedelta
 
-def parse_price(price_str: str) -> int:
-    cleaned = re.sub(
-        r"[^\d]",
-        "",
-        price_str,
-    ).replace(",", ".")
 
-    return int(cleaned)
+def parse_price(price_str: str) -> int:
+    kept = re.sub(r"[^\d,.]", "", price_str)
+
+    last_sep = max(kept.rfind(","), kept.rfind("."))
+    if last_sep == -1:
+        return int(kept)
+
+    integer_part = re.sub(r"[,.]", "", kept[:last_sep])
+    fractional_part = kept[last_sep + 1 :]
+
+    if len(fractional_part) == 3:
+        # the separator groups thousands (e.g. "1.200" or "1,200" -> 1200)
+        return int(integer_part + fractional_part)
+
+    # the separator is a decimal mark (e.g. "1300,50" -> 1300.50), cents are truncated
+    return int(float(f"{integer_part}.{fractional_part}"))
 
 
 def parse_surface(surface_str: str) -> float:
+    # strip the unit ("m²" or the plain-ASCII "m2") so its trailing digit
+    # doesn't get mistaken for part of the number
+    surface_str = re.sub(r"m\s*[²2]\b", "", surface_str, flags=re.IGNORECASE)
+
     cleaned = re.sub(
         r"[^\d.]",
         "",
@@ -19,6 +32,7 @@ def parse_surface(surface_str: str) -> float:
     )
 
     return float(cleaned)
+
 
 def parse_rooms(rooms_str: str) -> int:
     cleaned = re.sub(
@@ -28,6 +42,7 @@ def parse_rooms(rooms_str: str) -> int:
     )
 
     return int(cleaned)
+
 
 WEEKDAYS_FR = {
     "lundi": 0,

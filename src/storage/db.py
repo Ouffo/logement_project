@@ -10,7 +10,7 @@ load_dotenv()
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+psycopg://logement:logement@localhost:5432/logement_db",
-    )
+)
 
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace(

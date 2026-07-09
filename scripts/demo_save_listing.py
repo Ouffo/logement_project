@@ -1,8 +1,8 @@
 if __name__ == "__main__":
-    from src.storage.db import SessionLocal
-    from src.storage.repository import save_listing
-    from src.storage.models import RentalListing
     from src.scoring.ranker import compute_listing_score as compute_relevance_score
+    from src.storage.db import SessionLocal
+    from src.storage.models import RentalListing
+    from src.storage.repository import save_listing
     from src.utils.logger import logger
 
     # Create a sample listing
@@ -19,7 +19,7 @@ if __name__ == "__main__":
         postal_code="75014",
         furnished=True,
         parking=True,
-        quiet=True
+        quiet=True,
     )
 
     demo_listing.relevance_score = compute_relevance_score(demo_listing)
@@ -27,11 +27,8 @@ if __name__ == "__main__":
     session = SessionLocal()
 
     try:
-        saved_listing =save_listing(
-            session = session,
-            listing = demo_listing
-            )
-        
+        saved_listing = save_listing(session=session, listing=demo_listing)
+
         logger.info("listing saved")
         logger.info(f"saved DB id: {saved_listing.id}")
         logger.info(f"relevance score: {saved_listing.relevance_score}")

@@ -1,5 +1,6 @@
-from airflow import DAG
 from datetime import datetime
+
+from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 
@@ -17,9 +18,5 @@ with DAG(
         "email_on_failure": True,
     },
     tags=["test"],
-
 ) as dag:
-    PythonOperator(
-        task_id="fail_task",
-        python_callable=fail
-    )
+    PythonOperator(task_id="fail_task", python_callable=fail)

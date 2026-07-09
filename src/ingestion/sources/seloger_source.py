@@ -1,30 +1,23 @@
 import random
 import re
 from datetime import UTC, datetime
-from pydantic import HttpUrl
-from bs4 import BeautifulSoup
 from pathlib import Path
-from datetime import datetime, UTC
-from src.utils.logger import logger
-from src.storage.repository import RentalListingSource
-from src.storage.orm_models import RentalListingORM
-from src.storage.models import RentalListing
-from src.storage.repository import clean_htmls
-from urllib.parse import (
-    urlparse, 
-    parse_qs, 
-    urlencode, 
-    urlunparse,
-    urljoin, 
-    urlsplit, 
-    urlunsplit
-)
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlsplit, urlunparse, urlunsplit
+
+from bs4 import BeautifulSoup
+from pydantic import HttpUrl
+
 from src.ingestion.browser_client import (
-    browser_context, 
-    open_page, 
-    get_rendered_html,
+    browser_context,
     close_page,
+    get_rendered_html,
+    open_page,
 )
+from src.storage.models import RentalListing
+from src.storage.orm_models import RentalListingORM
+from src.storage.repository import RentalListingSource, clean_htmls
+from src.utils.logger import logger
+
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
 
 
@@ -47,6 +40,7 @@ def clean_url(url: str | None) -> str | None:
     clean = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
 
     return clean
+
 
 def parse_seloger_source_id(url: str | None, card_id: str | None = None) -> str | None:
     if url:
@@ -94,7 +88,10 @@ def parse_floor(text: str | None) -> int | None:
     if not text:
         return None
 
-    match = re.search(r"(\d+)(?:er|ème|e)\s+étage", text, flags=re.IGNORECASE)
+    if re.search(r"rez.de.chauss[ée]e", text, flags=re.IGNORECASE):
+        return 0
+
+    match = re.search(r"(\d+)(?:er|[eè]me|e)\s+[eé]tage", text, flags=re.IGNORECASE)
     return int(match.group(1)) if match else None
 
 
@@ -183,13 +180,17 @@ def parse_seloger_card(card) -> RentalListing | None:
     )
 
     header_text = clean_text(
-        card.select_one('[data-testid="cardmfe-description-box-text-test-id"]').get_text(" ", strip=True)
+        card.select_one('[data-testid="cardmfe-description-box-text-test-id"]').get_text(
+            " ", strip=True
+        )
         if card.select_one('[data-testid="cardmfe-description-box-text-test-id"]')
         else None
     )
 
     description = clean_text(
-        card.select_one('[data-testid="cardmfe-description-text-test-id"]').get_text(" ", strip=True)
+        card.select_one('[data-testid="cardmfe-description-text-test-id"]').get_text(
+            " ", strip=True
+        )
         if card.select_one('[data-testid="cardmfe-description-text-test-id"]')
         else None
     )
@@ -203,7 +204,7 @@ def parse_seloger_card(card) -> RentalListing | None:
     image_url = image.get("src") if image else None
 
     title = parse_title(header_text or full_text)
-    if title == None:
+    if title is None:
         logger.info("Skipping not appartment listing")
         return None
 
@@ -217,15 +218,15 @@ def parse_seloger_card(card) -> RentalListing | None:
         postal_code=parse_postal_code(header_text or full_text),
         address=address,
         district_name=parse_district_name(address or header_text or full_text),
-        price_eur= parse_price_eur(price_text or full_text),
+        price_eur=parse_price_eur(price_text or full_text),
         surface_m2=parse_surface_m2(keyfacts or full_text),
         rooms=parse_rooms(keyfacts or full_text),
         bedrooms=None,
         floor=parse_floor(keyfacts or full_text),
-        furnished= "meublé" in (description or "").lower(),
-        parking= "parking" in (description or full_text or "").lower(),
-        quiet= "calme" in (description or full_text or "").lower(),
-        energy_class= parse_energy_class(card),
+        furnished="meublé" in (description or "").lower(),
+        parking="parking" in (description or full_text or "").lower(),
+        quiet="calme" in (description or full_text or "").lower(),
+        energy_class=parse_energy_class(card),
         posted_at=None,
         image_url=image_url,
     )
@@ -242,10 +243,10 @@ def parse_seloger_search_html(html: str) -> list[RentalListing]:
     for card in cards:
         listing = parse_seloger_card(card)
 
-        if listing == None:
+        if listing is None:
             continue
 
-        if listing.source_id == None:
+        if listing.source_id is None:
             continue
 
         if listing.source_id in seen_ids:
@@ -256,14 +257,14 @@ def parse_seloger_search_html(html: str) -> list[RentalListing]:
 
     return listings
 
+
 def with_page_param(url: str, page_number: int) -> str:
     parsed = urlparse(url)
     query = parse_qs(parsed.query)
     query["page"] = [str(page_number)]
 
-    return urlunparse(
-        parsed._replace(query=urlencode(query, doseq=True))
-    )
+    return urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+
 
 def get_seloger_max_page(page) -> int:
     buttons = page.locator("button[aria-label^='à la page']")
@@ -277,6 +278,7 @@ def get_seloger_max_page(page) -> int:
             max_page = max(max_page, int(match.group(1)))
 
     return max_page
+
 
 class SeLogerSource(RentalListingSource):
     name = "seloger"
@@ -300,9 +302,13 @@ class SeLogerSource(RentalListingSource):
             close_page(search_page)
 
             for page_number in range(1, max_pages + 1):
-                url = self.search_url if page_number == 1 else with_page_param(
-                    self.search_url,
-                    page_number,
+                url = (
+                    self.search_url
+                    if page_number == 1
+                    else with_page_param(
+                        self.search_url,
+                        page_number,
+                    )
                 )
 
                 page = open_page(context, url)
@@ -311,19 +317,19 @@ class SeLogerSource(RentalListingSource):
                 html_pages.append(get_rendered_html(page))
                 close_page(page)
 
-
         folder = Path(self.storage_path)
         folder.mkdir(parents=True, exist_ok=True)
         for i, html in enumerate(html_pages):
-            file_path = folder / f"seloger_playwright_{i+1}.html"
+            file_path = folder / f"seloger_playwright_{i + 1}.html"
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(html)
 
     def fetch_detail_htmls(self, listings: list[RentalListingORM]):
         return []
-    
+
     def enrich_listing(
-        self, 
+        self,
         listing: RentalListingORM,
-        html: str,):
+        html: str,
+    ):
         return None

@@ -1,16 +1,19 @@
 import random
 import re
 from datetime import UTC, datetime
-from bs4 import BeautifulSoup
 from pathlib import Path
-from src.storage.repository import clean_htmls
+
+from bs4 import BeautifulSoup
+
 from src.ingestion.browser_client import browser_context, close_page, get_rendered_html, open_page
 from src.ingestion.sources.base import RentalListingSource
+from src.processing.parsers import parse_price, parse_surface
 from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
-from src.utils.scrapping import get_next_page_url
-from src.processing.parsers import parse_price, parse_surface
+from src.storage.repository import clean_htmls
 from src.utils.logger import logger
+from src.utils.scrapping import get_next_page_url
+
 
 def parse_bienici_search_html(html: str) -> list[RentalListing]:
     soup = BeautifulSoup(html, "html.parser")
@@ -32,11 +35,7 @@ def parse_bienici_search_html(html: str) -> list[RentalListing]:
             continue
 
         href = link_el.get("href")
-        url = (
-            f"https://www.bienici.com{href}"
-            if href.startswith("/")
-            else href
-        )
+        url = f"https://www.bienici.com{href}" if href.startswith("/") else href
 
         title_el = article.select_one(".real-estate-main-info__title")
         address_el = article.select_one(".real-estate-main-info__address")
@@ -47,11 +46,7 @@ def parse_bienici_search_html(html: str) -> list[RentalListing]:
         title = title_el.get_text(" ", strip=True) if title_el else None
         address = address_el.get_text(" ", strip=True) if address_el else None
         price_text = price_el.get_text(" ", strip=True) if price_el else None
-        description = (
-            description_el.get_text("\n", strip=True)
-            if description_el
-            else None
-        )
+        description = description_el.get_text("\n", strip=True) if description_el else None
         image_url = image_el.get("src") if image_el else None
 
         if not title or not price_text:
@@ -66,7 +61,10 @@ def parse_bienici_search_html(html: str) -> list[RentalListing]:
             continue
 
         postal_code = parse_bienici_postal_code(address)
-        city = "Paris" if postal_code and postal_code.startswith("75") else None
+        # the search itself is scoped to Paris, and RentalListing.city isn't
+        # optional, so we can't fall back to None when the postal code can't
+        # be parsed out of the address text
+        city = "Paris"
 
         full_text = f"{title}\n{address or ''}\n{description or ''}"
 
@@ -86,15 +84,9 @@ def parse_bienici_search_html(html: str) -> list[RentalListing]:
             surface_m2=surface_m2,
             rooms=rooms,
             bedrooms=None,
-            furnished=(
-                "meublé" in full_text.lower()
-                or "meublée" in full_text.lower()
-            ),
+            furnished=("meublé" in full_text.lower() or "meublée" in full_text.lower()),
             parking="parking" in full_text.lower(),
-            quiet=(
-                "calme" in full_text.lower()
-                or "silencieux" in full_text.lower()
-            ),
+            quiet=("calme" in full_text.lower() or "silencieux" in full_text.lower()),
             posted_at=None,
             relevance_score=None,
             image_url=image_url,
@@ -135,44 +127,44 @@ def parse_bienici_postal_code(text: str | None) -> str | None:
     match = re.search(r"\b(75\d{3})\b", text)
     return match.group(1) if match else None
 
+
 FRENCH_MONTHS = {
-    "janvier": 1, "janv": 1, "janv.": 1,
-    "février": 2, "fevrier": 2, "févr": 2, "févr.": 2, "fevr": 2, "fevr.": 2,
+    "janvier": 1,
+    "janv": 1,
+    "janv.": 1,
+    "février": 2,
+    "fevrier": 2,
+    "févr": 2,
+    "févr.": 2,
+    "fevr": 2,
+    "fevr.": 2,
     "mars": 3,
-    "avril": 4, "avr": 4, "avr.": 4,
+    "avril": 4,
+    "avr": 4,
+    "avr.": 4,
     "mai": 5,
     "juin": 6,
-    "juillet": 7, "juil": 7, "juil.": 7,
-    "août": 8, "aout": 8,
-    "septembre": 9, "sept": 9, "sept.": 9,
-    "octobre": 10, "oct": 10, "oct.": 10,
-    "novembre": 11, "nov": 11, "nov.": 11,
-    "décembre": 12, "decembre": 12, "déc": 12, "déc.": 12, "dec": 12, "dec.": 12,
+    "juillet": 7,
+    "juil": 7,
+    "juil.": 7,
+    "août": 8,
+    "aout": 8,
+    "septembre": 9,
+    "sept": 9,
+    "sept.": 9,
+    "octobre": 10,
+    "oct": 10,
+    "oct.": 10,
+    "novembre": 11,
+    "nov": 11,
+    "nov.": 11,
+    "décembre": 12,
+    "decembre": 12,
+    "déc": 12,
+    "déc.": 12,
+    "dec": 12,
+    "dec.": 12,
 }
-
-
-def parse_bienici_posted_at(section) -> datetime | None:
-    text = section.get_text("\n", strip=True)
-
-    match = re.search(
-        r"Publiée?\s+le\s+(\d{1,2})\s+([a-zéûîôàèùç.]+)\s+(\d{4})",
-        text,
-        flags=re.IGNORECASE,
-    )
-
-    if not match:
-        return None
-
-    day = int(match.group(1))
-    month_name = match.group(2).lower()
-    year = int(match.group(3))
-
-    month = FRENCH_MONTHS.get(month_name)
-
-    if month is None:
-        return None
-
-    return datetime(year, month, day, tzinfo=UTC)
 
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
 
@@ -223,6 +215,7 @@ def parse_bienici_energy_class_from_rating(energy_section) -> str | None:
             return match.group(1)
 
     return None
+
 
 def parse_bienici_energy_class_from_json(energy_section) -> str | None:
     html = str(energy_section)
@@ -294,6 +287,7 @@ def energy_class_from_dpe_score(score: int) -> str:
         return "F"
     return "G"
 
+
 def parse_bienici_construction_year(section) -> int | None:
     text = section.get_text("\n", strip=True)
 
@@ -315,19 +309,43 @@ def parse_bienici_construction_year(section) -> int | None:
 
 
 FRENCH_MONTHS = {
-    "janvier": 1, "janv": 1, "janv.": 1,
-    "février": 2, "fevrier": 2, "févr": 2, "févr.": 2, "fevr": 2, "fevr.": 2,
+    "janvier": 1,
+    "janv": 1,
+    "janv.": 1,
+    "février": 2,
+    "fevrier": 2,
+    "févr": 2,
+    "févr.": 2,
+    "fevr": 2,
+    "fevr.": 2,
     "mars": 3,
-    "avril": 4, "avr": 4, "avr.": 4,
+    "avril": 4,
+    "avr": 4,
+    "avr.": 4,
     "mai": 5,
     "juin": 6,
-    "juillet": 7, "juil": 7, "juil.": 7,
-    "août": 8, "aout": 8,
-    "septembre": 9, "sept": 9, "sept.": 9,
-    "octobre": 10, "oct": 10, "oct.": 10,
-    "novembre": 11, "nov": 11, "nov.": 11,
-    "décembre": 12, "decembre": 12, "déc": 12, "déc.": 12, "dec": 12, "dec.": 12,
+    "juillet": 7,
+    "juil": 7,
+    "juil.": 7,
+    "août": 8,
+    "aout": 8,
+    "septembre": 9,
+    "sept": 9,
+    "sept.": 9,
+    "octobre": 10,
+    "oct": 10,
+    "oct.": 10,
+    "novembre": 11,
+    "nov": 11,
+    "nov.": 11,
+    "décembre": 12,
+    "decembre": 12,
+    "déc": 12,
+    "déc.": 12,
+    "dec": 12,
+    "dec.": 12,
 }
+
 
 def parse_bienici_posted_at(section) -> datetime | None:
     text = section.get_text("\n", strip=True)
@@ -352,6 +370,7 @@ def parse_bienici_posted_at(section) -> datetime | None:
 
     return datetime(year, month, day, tzinfo=UTC)
 
+
 class BieniciSource(RentalListingSource):
     name = "bienici"
     search_url = "https://www.bienici.com/recherche/location/paris-75000/appartement/1-piece-et-plus?prix-max=1200&surface-min=25"
@@ -368,13 +387,17 @@ class BieniciSource(RentalListingSource):
 
         with browser_context() as context:
             search_page = open_page(context, self.search_url)
-            search_page.wait_for_timeout(random.choice([2000, 5000]))  # Random wait to mimic human behavior
+            search_page.wait_for_timeout(
+                random.choice([2000, 5000])
+            )  # Random wait to mimic human behavior
             next_page = get_next_page_url(search_page)
             html_pages.append(get_rendered_html(search_page))
             while next_page:
                 logger.info(f"Navigating to next page: {next_page}")
                 search_page.goto(next_page, wait_until="domcontentloaded", timeout=60000)
-                search_page.wait_for_timeout(random.choice([2000, 5000]))  # Random wait to mimic human behavior
+                search_page.wait_for_timeout(
+                    random.choice([2000, 5000])
+                )  # Random wait to mimic human behavior
 
                 html_pages.append(get_rendered_html(search_page))
                 next_page = get_next_page_url(search_page)
@@ -383,7 +406,7 @@ class BieniciSource(RentalListingSource):
         folder = Path(self.storage_path)
         folder.mkdir(parents=True, exist_ok=True)
         for i, html in enumerate(html_pages):
-            file_path = folder / f"bienici_playwright_{i+1}.html"
+            file_path = folder / f"bienici_playwright_{i + 1}.html"
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(html)
 
@@ -402,21 +425,17 @@ class BieniciSource(RentalListingSource):
                     page = open_page(context, str(listing.url))
                     page.wait_for_timeout(random.choice([5000, 10000]))
 
-                    detail_pages.append(
-                        (listing, get_rendered_html(page))
-                    )
+                    detail_pages.append((listing, get_rendered_html(page)))
 
                     close_page(page)
                 else:
                     print(f"reading html {source_id}.html")
                     file_path = Path(folder / f"{source_id}.html")
                     html = file_path.read_text(encoding="utf-8")
-                    detail_pages.append(
-                        (listing, html)
-                    )
+                    detail_pages.append((listing, html))
 
         return detail_pages
-    
+
     def enrich_listing(
         self,
         listing: RentalListingORM,

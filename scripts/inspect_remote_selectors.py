@@ -3,11 +3,6 @@ from bs4 import BeautifulSoup
 from src.ingestion.http_client import fetch_html
 from src.utils.logger import logger
 
-from bs4 import BeautifulSoup
-
-from src.ingestion.http_client import fetch_html
-
-
 url = "https://books.toscrape.com/"
 
 html = fetch_html(url)

@@ -1,7 +1,6 @@
+from src.scoring.image_scorer import score_listing_image
 from src.storage.db import SessionLocal
 from src.storage.orm_models import RentalListingORM
-from src.scoring.image_scorer import score_listing_image
-
 
 session = SessionLocal()
 

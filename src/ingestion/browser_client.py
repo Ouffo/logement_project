@@ -1,7 +1,11 @@
-from playwright.sync_api import sync_playwright
+from contextlib import contextmanager
+
+from playwright.sync_api import BrowserContext, Page, sync_playwright
+
 from src.ingestion.sources.base import Source
-from src.utils.scrapping import (dismiss_cookie_banner, simulate_scroll, get_next_page_url)
 from src.utils.logger import logger
+from src.utils.scrapping import dismiss_cookie_banner, get_next_page_url, simulate_scroll
+
 
 def scrap_page(source: Source, page, html_list):
     page.wait_for_timeout(2000)
@@ -29,13 +33,10 @@ def scrap_page(source: Source, page, html_list):
         logger.info("Saving page content")
         return page.content()
 
-def fetch_rendered_html(
-    source: Source,
-    headless: bool = False
-) -> list[str]:
+
+def fetch_rendered_html(source: Source, headless: bool = False) -> list[str]:
     html_list = []
     with sync_playwright() as p:
-        
         browser = p.chromium.launch_persistent_context(
             user_data_dir="./pap_profile",
             headless=headless,
@@ -53,9 +54,9 @@ def fetch_rendered_html(
         page.goto(source.search_url, wait_until="domcontentloaded", timeout=60000)
         logger.info("Page loaded")
 
-        #click on the cookie banner if it exists
+        # click on the cookie banner if it exists
         dismiss_cookie_banner(page)
-        #next_page = get_next_page_url(page)
+        # next_page = get_next_page_url(page)
         next_page = None
 
         scrap_page(source, page, html_list)
@@ -70,10 +71,6 @@ def fetch_rendered_html(
         browser.close()
 
         return html_list
-
-
-from contextlib import contextmanager
-from playwright.sync_api import sync_playwright, BrowserContext, Page
 
 
 @contextmanager

@@ -1,9 +1,10 @@
 import random
-from pathlib import Path
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Comment
+
 from src.utils.logger import logger
-from urllib.parse import urljoin
+
 
 def dismiss_cookie_banner(page):
     page.wait_for_timeout(2000)  # Wait for 2 seconds to ensure the cookie banner is loaded
@@ -15,22 +16,21 @@ def dismiss_cookie_banner(page):
     #     .or_(page.get_by_role("button", name="Decline"))
     # )
     cookie_btn = page.locator(
-    "button:has-text('Continuer sans accepter'), "
-    "a:has-text('Continuer sans accepter'), "
-    "button:has-text('Tout refuser'), "
-    "a:has-text('Tout refuser')"
+        "button:has-text('Continuer sans accepter'), "
+        "a:has-text('Continuer sans accepter'), "
+        "button:has-text('Tout refuser'), "
+        "a:has-text('Tout refuser')"
     )
-    
+
     if cookie_btn.count() > 0:
         logger.info("Found cookie button")
         cookie_btn.first.click()
 
+
 def simulate_scroll(page):
     while True:
         scroll_y = page.evaluate("window.scrollY")
-        max_scroll = page.evaluate(
-            "document.body.scrollHeight - window.innerHeight"
-        )
+        max_scroll = page.evaluate("document.body.scrollHeight - window.innerHeight")
 
         if scroll_y >= max_scroll:
             logger.info("Reached the bottom of the page")
@@ -41,9 +41,8 @@ def simulate_scroll(page):
             random.randint(1200, 2000),
         )
 
-        page.wait_for_timeout(
-            random.randint(1500, 4000)
-        )
+        page.wait_for_timeout(random.randint(1500, 4000))
+
 
 def get_next_page_url(page) -> str | None:
     patterns = [
@@ -67,6 +66,7 @@ def get_next_page_url(page) -> str | None:
                 logger.info("found locator to click")
     return None  # Pas de page suivante
 
+
 REMOVE_TAGS = {
     "script",
     "style",
@@ -81,7 +81,7 @@ REMOVE_TAGS = {
     "input",
     "select",
     "textarea",
-    "header"
+    "header",
 }
 
 
@@ -125,17 +125,15 @@ def extract_body_content(html: str) -> str:
         for tag in soup.select(selector):
             tag.decompose()
 
-
     body = soup.body or soup
 
-    main = (
-        body.find("main")
-        or body.find("article")
-        or body
-    )
+    main = body.find("main") or body.find("article") or body
 
     for pattern in REMOVE_TEXT_PATTERNS:
-        for text_node in main.find_all(string=lambda text: text and pattern in text):
+        for text_node in main.find_all(string=True):
+            if pattern not in text_node:
+                continue
+
             parent = text_node.parent
             if parent and parent.name in {"p", "a", "li", "span", "strong"}:
                 parent.decompose()
@@ -173,13 +171,10 @@ def extract_body_content(html: str) -> str:
 
     # Garde seulement quelques attributs utiles
     for tag in main.find_all(True):
-        tag.attrs = {
-            key: value
-            for key, value in tag.attrs.items()
-            if key in KEEP_ATTRS
-        }
+        tag.attrs = {key: value for key, value in tag.attrs.items() if key in KEEP_ATTRS}
 
     return main.decode_contents()
+
 
 def extract_leboncoin_search_content(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
@@ -195,6 +190,7 @@ def extract_leboncoin_search_content(html: str) -> str:
     parts.append("</div>")
 
     return "\n".join(parts)
+
 
 def combine_htmls(
     html_pages: list[tuple[str, str]],
