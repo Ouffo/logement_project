@@ -38,7 +38,7 @@ def fetch_rendered_html(source: Source, headless: bool = False) -> list[str]:
     html_list = []
     with sync_playwright() as p:
         browser = p.chromium.launch_persistent_context(
-            user_data_dir="./pap_profile",
+            user_data_dir="/tmp/pap_profile",
             headless=headless,
             viewport={"width": 1200, "height": 800},
             locale="fr-FR",
@@ -77,7 +77,7 @@ def fetch_rendered_html(source: Source, headless: bool = False) -> list[str]:
 def browser_context(headless: bool = False):
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
-            user_data_dir="./ouffo_profile",
+            user_data_dir="/tmp/ouffo_profile",
             headless=headless,
             viewport={"width": 1200, "height": 800},
             locale="fr-FR",
