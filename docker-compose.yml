@@ -18,10 +18,12 @@ services:
     container_name: logement_pipeline
     profiles:
       - manual
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     env_file:
       - .env
     environment:
       PYTHONPATH: /app
+      HOME: /tmp
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -60,7 +62,9 @@ services:
 
   airflow-webserver:
     image: apache/airflow:2.10.5
-    user: "0:0"
+    user: "${HOST_UID:-1000}:0"
+    group_add:
+      - "${DOCKER_GID:-999}"
     depends_on:
       - airflow-postgres
     ports:
@@ -89,11 +93,15 @@ services:
 
   airflow-scheduler:
     image: apache/airflow:2.10.5
-    user: "0:0"
+    user: "${HOST_UID:-1000}:0"
+    group_add:
+      - "${DOCKER_GID:-999}"
     depends_on:
       - airflow-postgres
     environment:
       PROJECT_ROOT: ${PROJECT_ROOT}
+      HOST_UID: ${HOST_UID:-1000}
+      HOST_GID: ${HOST_GID:-1000}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
 
@@ -107,7 +115,7 @@ services:
       AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
       AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
       AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_FROM}
-      
+
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs

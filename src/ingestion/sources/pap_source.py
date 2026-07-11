@@ -16,7 +16,17 @@ from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 from src.storage.repository import clean_htmls
 from src.utils.logger import logger
-from src.utils.scrapping import combine_htmls, extract_body_content, simulate_scroll
+from src.utils.scrapping import (
+    city_from_postal_code,
+    combine_htmls,
+    extract_body_content,
+    simulate_scroll,
+)
+
+
+def parse_leading_int(text: str) -> int | None:
+    match = re.match(r"\s*(\d+)", text)
+    return int(match.group(1)) if match else None
 
 
 def parse_pap_html(html: str) -> list[RentalListing]:
@@ -42,6 +52,10 @@ def parse_pap_html(html: str) -> list[RentalListing]:
         location = location_el.get_text(strip=True)
         description = item.select_one(".item-description").get_text(" ", strip=True)
 
+        if "colocation" in location.lower():
+            logger.info("Skipping colocation listing")
+            continue
+
         tags = [tag.get_text(" ", strip=True) for tag in item.select(".item-tags li")]
 
         rooms = None
@@ -51,9 +65,9 @@ def parse_pap_html(html: str) -> list[RentalListing]:
 
         for tag in tags:
             if "pièce" in tag:
-                rooms = int(tag.split()[0])
+                rooms = parse_leading_int(tag)
             elif "chambre" in tag:
-                bedrooms = int(tag.split()[0])
+                bedrooms = parse_leading_int(tag)
             elif "m²" in tag:
                 surface_m2 = parse_surface(tag)
 
@@ -168,6 +182,10 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
         location = h2.get_text(" ", strip=True)
         full_text = section.get_text("\n", strip=True)
 
+        if "colocation" in url.lower() or "colocation" in title_text.lower():
+            logger.info(f"Skipping colocation listing: {url}")
+            continue
+
         price_el = h1.select_one("span")
         if not price_el:
             logger.warning(f"Skipping PAP detail without price: {url}")
@@ -185,9 +203,9 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
             value_lower = value.lower()
 
             if "pièce" in value_lower:
-                rooms = int(value.split()[0])
+                rooms = parse_leading_int(value)
             elif "chambre" in value_lower:
-                bedrooms = int(value.split()[0])
+                bedrooms = parse_leading_int(value)
             elif "m²" in value_lower:
                 surface_m2 = parse_surface(value)
 
@@ -205,7 +223,7 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
         image_el = section.select_one('img[src^="https://cdn.pap.fr"]')
         image_url = image_el.get("src") if image_el else None
 
-        postal_code_match = re.search(r"(75\d{3})", location)
+        postal_code_match = re.search(r"(75\d{3}|78140)", location)
         postal_code = postal_code_match.group(1) if postal_code_match else None
 
         posted_at = parse_pap_posted_at(full_text)
@@ -217,7 +235,7 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
                 url=url,
                 title=title_text,
                 description=description,
-                city="Paris",
+                city=city_from_postal_code(postal_code),
                 postal_code=postal_code,
                 address=None,
                 district_name=location,
@@ -286,7 +304,7 @@ def merge_pap_list_and_detail(
 
 class PapSource(RentalListingSource):
     name = "pap"
-    search_url = "https://www.pap.fr/annonce/locations-appartement-paris-75-g439-du-studio-au-2-pieces-a-partir-de-1-chambres-jusqu-a-1200-euros-a-partir-de-25-m2"
+    search_url = "https://www.pap.fr/annonce/locations-appartement-particulier-paris-75-g439g39092-jusqu-a-1200-euros-a-partir-de-25-m2-3"
     storage_path = "data/raw/pap_htmls"
     detail_storage_path = None
     parser = staticmethod(parse_pap_detail_html)

@@ -12,7 +12,7 @@ from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 from src.storage.repository import clean_htmls
 from src.utils.logger import logger
-from src.utils.scrapping import get_next_page_url
+from src.utils.scrapping import city_from_postal_code, get_next_page_url
 
 
 def parse_bienici_search_html(html: str) -> list[RentalListing]:
@@ -61,10 +61,9 @@ def parse_bienici_search_html(html: str) -> list[RentalListing]:
             continue
 
         postal_code = parse_bienici_postal_code(address)
-        # the search itself is scoped to Paris, and RentalListing.city isn't
-        # optional, so we can't fall back to None when the postal code can't
-        # be parsed out of the address text
-        city = "Paris"
+        # RentalListing.city isn't optional, so we can't fall back to None
+        # when the postal code can't be parsed out of the address text
+        city = city_from_postal_code(postal_code)
 
         full_text = f"{title}\n{address or ''}\n{description or ''}"
 
@@ -124,7 +123,7 @@ def parse_bienici_postal_code(text: str | None) -> str | None:
     if not text:
         return None
 
-    match = re.search(r"\b(75\d{3})\b", text)
+    match = re.search(r"\b(75\d{3}|78140)\b", text)
     return match.group(1) if match else None
 
 
@@ -373,7 +372,7 @@ def parse_bienici_posted_at(section) -> datetime | None:
 
 class BieniciSource(RentalListingSource):
     name = "bienici"
-    search_url = "https://www.bienici.com/recherche/location/paris-75000/appartement/1-piece-et-plus?prix-max=1200&surface-min=25"
+    search_url = "https://www.bienici.com/recherche/location/paris-75000,velizy-villacoublay-78140/appartement/1-piece-et-plus?prix-max=1200&surface-min=25&camera=12_2.2863873_48.8176371_0_0"
     storage_path = "data/raw/bienici_htmls"
     detail_storage_path = "data/raw/bienici_details_htmls"
     parser = staticmethod(parse_bienici_search_html)

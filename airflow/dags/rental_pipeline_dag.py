@@ -9,6 +9,8 @@ from airflow.providers.docker.operators.docker import DockerOperator
 SOURCE_NAMES = ["pap", "leboncoin", "bienici", "seloger"]
 
 PROJECT_ROOT = os.environ["PROJECT_ROOT"]
+HOST_UID = os.getenv("HOST_UID", "1000")
+HOST_GID = os.getenv("HOST_GID", "1000")
 
 COMMON_DOCKER_ARGS = {
     "image": "logement_project-pipeline",
@@ -16,6 +18,8 @@ COMMON_DOCKER_ARGS = {
     "network_mode": "logement_project_default",
     "auto_remove": "success",
     "mount_tmp_dir": False,
+    "user": f"{HOST_UID}:{HOST_GID}",
+    "environment": {"HOME": "/tmp"},
     "execution_timeout": timedelta(hours=2),
     "mounts": [
         Mount(

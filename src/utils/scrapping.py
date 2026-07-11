@@ -6,6 +6,13 @@ from bs4 import BeautifulSoup, Comment
 from src.utils.logger import logger
 
 
+def city_from_postal_code(postal_code: str | None) -> str:
+    if postal_code == "78140":
+        return "Vélizy-Villacoublay"
+
+    return "Paris"
+
+
 def dismiss_cookie_banner(page):
     page.wait_for_timeout(2000)  # Wait for 2 seconds to ensure the cookie banner is loaded
     # cookie_btn = (

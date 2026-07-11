@@ -1,10 +1,13 @@
 import argparse
 import os
+import time
 from datetime import UTC, datetime
+from functools import wraps
 
 from extract_listings import extract_all_listings
 from save_listings import save_listings
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from src.ingestion.sources.base import RentalListingSource
 from src.ingestion.sources.bienici_source import BieniciSource
@@ -45,6 +48,39 @@ SOURCE_LOCK_IDS = {
     "bienici": _lock_id("bienici"),
     "seloger": _lock_id("seloger"),
 }
+
+
+def retry_on_disconnect(max_attempts: int = 3, delay_seconds: float = 10):
+    """Retries the whole function on a transient DB connection error.
+
+    Each retry starts from scratch with a fresh session (created inside the
+    wrapped function), so it's only safe to use on functions that open their
+    own session and re-derive their work from current DB state rather than
+    reusing objects from a previous attempt.
+    """
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except DBAPIError as exc:
+                    # connection_invalidated covers both a dropped socket
+                    # (OperationalError) and a server-terminated session,
+                    # e.g. idle_in_transaction_session_timeout (InternalError)
+                    # — not e.g. an IntegrityError, which retrying can't fix.
+                    if not exc.connection_invalidated or attempt == max_attempts:
+                        raise
+                    logger.warning(
+                        f"{func.__name__} hit a transient DB connection error "
+                        f"(attempt {attempt}/{max_attempts}), retrying in {delay_seconds}s"
+                    )
+                    time.sleep(delay_seconds)
+
+        return wrapper
+
+    return decorator
 
 
 def daily_pipeline():
@@ -92,6 +128,7 @@ def daily_pipeline():
         logger.info("=" * 50)
 
 
+@retry_on_disconnect()
 def fetch_source_html(source: RentalListingSource):
     session = SessionLocal()
     lock_id = FETCH_SOURCE_LOCK_IDS["fetch_" + source.name]
@@ -140,6 +177,7 @@ def fetch_source_html(source: RentalListingSource):
         session.close()
 
 
+@retry_on_disconnect()
 def extract_and_save_source_listings(source: RentalListingSource):
     session = SessionLocal()
     lock_id = EXTRACT_SAVE_SOURCE_LOCK_IDS["extract_save_" + source.name]
@@ -165,7 +203,7 @@ def extract_and_save_source_listings(source: RentalListingSource):
         listings = extract_all_listings(source)
         listings = deduplicate_listings(listings)
         save_listings(session, listings)
-        logger.info("Saved listings")
+        logger.info(f"Saved {len(listings)} listings")
         logger.info("Inactivating passed listings")
         mark_missing_listings_inactive(
             session=session,
@@ -198,6 +236,7 @@ def extract_and_save_source_listings(source: RentalListingSource):
         session.close()
 
 
+@retry_on_disconnect()
 def run_enrich_listings(source: RentalListingSource):
     session = SessionLocal()
     lock_id = ENRICH_LOCK_IDS["enrich_" + source.name]
@@ -257,6 +296,7 @@ def run_source_pipeline(source: RentalListingSource):
     run_enrich_listings(source)
 
 
+@retry_on_disconnect()
 def run_image_scoring():
     session = SessionLocal()
 
@@ -299,6 +339,7 @@ def run_image_scoring():
         session.close()
 
 
+@retry_on_disconnect()
 def run_final_scoring():
     session = SessionLocal()
 

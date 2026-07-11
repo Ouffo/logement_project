@@ -17,6 +17,7 @@ from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 from src.storage.repository import RentalListingSource, clean_htmls
 from src.utils.logger import logger
+from src.utils.scrapping import city_from_postal_code
 
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
 
@@ -123,7 +124,7 @@ def parse_postal_code(text: str | None) -> str | None:
     if not text:
         return None
 
-    match = re.search(r"\((75\d{3})\)", text)
+    match = re.search(r"\((75\d{3}|78140)\)", text)
     return match.group(1) if match else None
 
 
@@ -132,7 +133,7 @@ def parse_district_name(text: str | None) -> str | None:
         return None
 
     # Exemple : Champerret-Berthier, Paris 17ème arrondissement (75017)
-    match = re.search(r"([^,]+),\s*Paris", text)
+    match = re.search(r"([^,]+),\s*(?:Paris|V[ée]lizy-Villacoublay)", text)
     return clean_text(match.group(1)) if match else None
 
 
@@ -208,14 +209,16 @@ def parse_seloger_card(card) -> RentalListing | None:
         logger.info("Skipping not appartment listing")
         return None
 
+    postal_code = parse_postal_code(header_text or full_text)
+
     return RentalListing(
         source="seloger",
         source_id=source_id,
         url=HttpUrl(url) if url else None,
         title=title,
         description=description,
-        city="Paris",
-        postal_code=parse_postal_code(header_text or full_text),
+        city=city_from_postal_code(postal_code),
+        postal_code=postal_code,
         address=address,
         district_name=parse_district_name(address or header_text or full_text),
         price_eur=parse_price_eur(price_text or full_text),
@@ -282,7 +285,7 @@ def get_seloger_max_page(page) -> int:
 
 class SeLogerSource(RentalListingSource):
     name = "seloger"
-    search_url = "https://www.seloger.com/classified-search?distributionTypes=Rent&estateTypes=Apartment&locations=AD08FR31096&priceMax=1200&spaceMin=25&m=homepage_relaunch_my_last_search_classified_search_result"
+    search_url = "https://www.seloger.com/classified-search?distributionTypes=Rent&estateTypes=Apartment&locations=AD08FR31096,AD08FR32607&priceMax=1200&spaceMin=25"
     storage_path = "data/raw/seloger_htmls"
     detail_storage_path = "data/raw/seloger_details_htmls"
     parser = staticmethod(parse_seloger_search_html)

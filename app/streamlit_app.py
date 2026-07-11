@@ -306,6 +306,7 @@ def load_listings() -> pd.DataFrame:
                 {
                     "source": listing.source,
                     "title": listing.title,
+                    "city": listing.city,
                     "postal_code": listing.postal_code,
                     "price_eur": listing.price_eur,
                     "surface_m2": listing.surface_m2,
@@ -374,6 +375,7 @@ def render_card(row):
     price = row.get("price_eur")
     surface = row.get("surface_m2")
     rooms = row.get("rooms")
+    city = row.get("city") or "Paris"
     postal = row.get("postal_code") or ""
     furnished = row.get("furnished")
     parking = row.get("parking")
@@ -436,7 +438,7 @@ def render_card(row):
                     <span class="sep">·</span>
                     {rooms_str}
                 </div>
-                <div class="listing-location">📍 Paris {postal}</div>
+                <div class="listing-location">📍 {city} {postal}</div>
                 {posted_html}
                 <div class="listing-tags">{tags_html}</div>{energy_html}
             </div>
@@ -492,7 +494,7 @@ df = df.sort_values("score", ascending=False, na_position="last").drop(
 
 # ── Filters ──────────────────────────────────────────────────────────────────
 with st.container():
-    c1, c2, c3 = st.columns([2, 2, 2])
+    c1, c2, c3, c4 = st.columns([2, 2, 2, 2])
     with c1:
         max_price = st.slider("Budget max (€/mois)", 0, 2000, 1200, 50)
     with c2:
@@ -500,9 +502,12 @@ with st.container():
     with c3:
         source_opts = ["Toutes"] + sorted(df["source"].dropna().unique().tolist())
         source = st.selectbox("Source", source_opts)
-
-    c4, c5, c6 = st.columns([2, 2, 2])
     with c4:
+        city_opts = ["Tous"] + sorted(df["city"].dropna().unique().tolist())
+        city_filter = st.selectbox("Lieu", city_opts)
+
+    c5, c6, c7 = st.columns([2, 2, 2])
+    with c5:
         energy_opts = ["Toutes"] + _ENERGY_CLASSES
         energy_max = st.selectbox(
             "Classe énergie (max acceptable)",
@@ -510,16 +515,19 @@ with st.container():
             help="Ex. : choisir D affiche les classes A, B, C et D",
         )
         include_unknown_energy = st.checkbox("Inclure annonces sans DPE", value=True)
-    with c5:
+    with c6:
         year_min = st.slider("Année de construction min", 1800, 2026, 1800, 10)
         include_unknown_year = st.checkbox("Inclure annonces sans année", value=True)
-    with c6:
+    with c7:
         sort_by_date = st.toggle("Afficher par ordre récent", value=False)
 
 # ── Filtering ────────────────────────────────────────────────────────────────
 filtered = df[(df["price_eur"] <= max_price) & (df["surface_m2"] >= min_surface)]
 if source != "Toutes":
     filtered = filtered[filtered["source"] == source]
+
+if city_filter != "Tous":
+    filtered = filtered[filtered["city"] == city_filter]
 
 if energy_max != "Toutes":
     allowed = _ENERGY_CLASSES[: _ENERGY_CLASSES.index(energy_max) + 1]

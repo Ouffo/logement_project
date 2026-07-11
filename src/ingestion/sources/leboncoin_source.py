@@ -16,7 +16,7 @@ from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 from src.storage.repository import clean_htmls
 from src.utils.logger import logger
-from src.utils.scrapping import get_next_page_url
+from src.utils.scrapping import city_from_postal_code, get_next_page_url
 
 from .base import RentalListingSource
 
@@ -78,7 +78,7 @@ def parse_rooms_and_surface(text: str) -> tuple[int | None, float | None]:
 
 def parse_location(text: str) -> tuple[str, str | None]:
     match = re.search(
-        r"Paris\s+(75\d{3})(?:\s+([^\n]+))?",
+        r"(Paris|V[ée]lizy-Villacoublay)\s+(75\d{3}|78140)(?:\s+([^\n]+))?",
         text,
         flags=re.IGNORECASE,
     )
@@ -86,9 +86,9 @@ def parse_location(text: str) -> tuple[str, str | None]:
     if not match:
         return "Paris", None
 
-    postal_code = match.group(1)
+    postal_code = match.group(2)
 
-    return "Paris", postal_code
+    return city_from_postal_code(postal_code), postal_code
 
 
 def parse_source_id(url: str) -> str:
@@ -331,17 +331,20 @@ def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
         price_eur = parse_price(price_match.group(1))
 
         location_match = re.search(
-            r"Paris\s+(75\d{3})([^\n]*)",
+            r"(Paris|V[ée]lizy-Villacoublay)\s+(75\d{3}|78140)([^\n]*)",
             text,
             flags=re.IGNORECASE,
         )
 
         postal_code = None
         district_name = None
+        city = "Paris"
 
         if location_match:
-            postal_code = location_match.group(1)
-            district_name = (f"Paris {postal_code}{location_match.group(2)}").strip()
+            city_name = location_match.group(1)
+            postal_code = location_match.group(2)
+            district_name = (f"{city_name} {postal_code}{location_match.group(3)}").strip()
+            city = city_from_postal_code(postal_code)
 
         image_el = article.select_one("img[src]")
         image_url = image_el.get("src") if image_el else None
@@ -360,7 +363,7 @@ def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
             url=url,
             title=title,
             description=subject_by_id.get(source_id),
-            city="Paris",
+            city=city,
             postal_code=postal_code,
             address=None,
             district_name=district_name,
@@ -385,7 +388,7 @@ def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
 
 class LeboncoinSource(RentalListingSource):
     name = "leboncoin"
-    search_url = "https://www.leboncoin.fr/recherche?category=8&locations=Paris__48.86017419624389_2.337177366534126_9370&price=800-1200"
+    search_url = "https://www.leboncoin.fr/recherche?category=8&locations=V%C3%A9lizy-Villacoublay_78140__48.78503_2.18247_3771,Paris__48.86017419624389_2.337177366534126_9370&price=800-1200"
     storage_path = "data/raw/leboncoin_htmls"
     detail_storage_path = "data/raw/leboncoin_details_htmls"
     parser = staticmethod(parse_leboncoin_search_html)
