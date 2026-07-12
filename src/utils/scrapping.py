@@ -1,16 +1,35 @@
 import random
+import re
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Comment
 
 from src.utils.logger import logger
 
+# Postal codes outside Paris (75xxx) that are in scope for the search.
+POSTAL_CODE_TO_CITY = {
+    "78140": "Vélizy-Villacoublay",
+    "92130": "Issy-les-Moulineaux",
+    "78210": "Saint-Cyr-l'École",
+}
+
+# Regex alternation for the postal codes above, for sources whose listing
+# text only exposes "<city> <postal_code>" without a clean field split.
+EXTRA_POSTAL_CODES_PATTERN = "|".join(re.escape(code) for code in POSTAL_CODE_TO_CITY)
+
+# Regex alternation for the city names above, tolerant to straight/curly
+# apostrophes and accent variants as they appear in scraped text.
+EXTRA_CITY_NAMES_PATTERN = "|".join(
+    [
+        r"V[ée]lizy-Villacoublay",
+        r"Issy-les-Moulineaux",
+        r"Saint-Cyr-l['’][eé]cole",
+    ]
+)
+
 
 def city_from_postal_code(postal_code: str | None) -> str:
-    if postal_code == "78140":
-        return "Vélizy-Villacoublay"
-
-    return "Paris"
+    return POSTAL_CODE_TO_CITY.get(postal_code, "Paris")
 
 
 def dismiss_cookie_banner(page):

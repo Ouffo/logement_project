@@ -17,7 +17,11 @@ from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 from src.storage.repository import RentalListingSource, clean_htmls
 from src.utils.logger import logger
-from src.utils.scrapping import city_from_postal_code
+from src.utils.scrapping import (
+    EXTRA_CITY_NAMES_PATTERN,
+    EXTRA_POSTAL_CODES_PATTERN,
+    city_from_postal_code,
+)
 
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
 
@@ -124,7 +128,7 @@ def parse_postal_code(text: str | None) -> str | None:
     if not text:
         return None
 
-    match = re.search(r"\((75\d{3}|78140)\)", text)
+    match = re.search(rf"\((75\d{{3}}|{EXTRA_POSTAL_CODES_PATTERN})\)", text)
     return match.group(1) if match else None
 
 
@@ -133,7 +137,7 @@ def parse_district_name(text: str | None) -> str | None:
         return None
 
     # Exemple : Champerret-Berthier, Paris 17ème arrondissement (75017)
-    match = re.search(r"([^,]+),\s*(?:Paris|V[ée]lizy-Villacoublay)", text)
+    match = re.search(rf"([^,]+),\s*(?:Paris|{EXTRA_CITY_NAMES_PATTERN})", text)
     return clean_text(match.group(1)) if match else None
 
 
@@ -285,7 +289,7 @@ def get_seloger_max_page(page) -> int:
 
 class SeLogerSource(RentalListingSource):
     name = "seloger"
-    search_url = "https://www.seloger.com/classified-search?distributionTypes=Rent&estateTypes=Apartment&locations=AD08FR31096,AD08FR32607&priceMax=1200&spaceMin=25"
+    search_url = "https://www.seloger.com/classified-search?distributionTypes=Rent&estateTypes=Apartment&locations=AD08FR31096,AD08FR32607,AD08FR36616,AD08FR32573&priceMax=1200&spaceMin=25"
     storage_path = "data/raw/seloger_htmls"
     detail_storage_path = "data/raw/seloger_details_htmls"
     parser = staticmethod(parse_seloger_search_html)

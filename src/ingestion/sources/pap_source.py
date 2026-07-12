@@ -17,6 +17,7 @@ from src.storage.orm_models import RentalListingORM
 from src.storage.repository import clean_htmls
 from src.utils.logger import logger
 from src.utils.scrapping import (
+    EXTRA_POSTAL_CODES_PATTERN,
     city_from_postal_code,
     combine_htmls,
     extract_body_content,
@@ -223,7 +224,7 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
         image_el = section.select_one('img[src^="https://cdn.pap.fr"]')
         image_url = image_el.get("src") if image_el else None
 
-        postal_code_match = re.search(r"(75\d{3}|78140)", location)
+        postal_code_match = re.search(rf"(75\d{{3}}|{EXTRA_POSTAL_CODES_PATTERN})", location)
         postal_code = postal_code_match.group(1) if postal_code_match else None
 
         posted_at = parse_pap_posted_at(full_text)
@@ -304,7 +305,7 @@ def merge_pap_list_and_detail(
 
 class PapSource(RentalListingSource):
     name = "pap"
-    search_url = "https://www.pap.fr/annonce/locations-appartement-particulier-paris-75-g439g39092-jusqu-a-1200-euros-a-partir-de-25-m2-3"
+    search_url = "https://www.pap.fr/annonce/locations-appartement-paris-75-g439g39092g39131g43270-jusqu-a-1200-euros-a-partir-de-25-m2"
     storage_path = "data/raw/pap_htmls"
     detail_storage_path = None
     parser = staticmethod(parse_pap_detail_html)

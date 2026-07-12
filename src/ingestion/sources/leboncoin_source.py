@@ -16,7 +16,12 @@ from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 from src.storage.repository import clean_htmls
 from src.utils.logger import logger
-from src.utils.scrapping import city_from_postal_code, get_next_page_url
+from src.utils.scrapping import (
+    EXTRA_CITY_NAMES_PATTERN,
+    EXTRA_POSTAL_CODES_PATTERN,
+    city_from_postal_code,
+    get_next_page_url,
+)
 
 from .base import RentalListingSource
 
@@ -78,7 +83,7 @@ def parse_rooms_and_surface(text: str) -> tuple[int | None, float | None]:
 
 def parse_location(text: str) -> tuple[str, str | None]:
     match = re.search(
-        r"(Paris|V[ée]lizy-Villacoublay)\s+(75\d{3}|78140)(?:\s+([^\n]+))?",
+        rf"(Paris|{EXTRA_CITY_NAMES_PATTERN})\s+(75\d{{3}}|{EXTRA_POSTAL_CODES_PATTERN})(?:\s+([^\n]+))?",
         text,
         flags=re.IGNORECASE,
     )
@@ -331,7 +336,7 @@ def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
         price_eur = parse_price(price_match.group(1))
 
         location_match = re.search(
-            r"(Paris|V[ée]lizy-Villacoublay)\s+(75\d{3}|78140)([^\n]*)",
+            rf"(Paris|{EXTRA_CITY_NAMES_PATTERN})\s+(75\d{{3}}|{EXTRA_POSTAL_CODES_PATTERN})([^\n]*)",
             text,
             flags=re.IGNORECASE,
         )
@@ -388,7 +393,7 @@ def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
 
 class LeboncoinSource(RentalListingSource):
     name = "leboncoin"
-    search_url = "https://www.leboncoin.fr/recherche?category=8&locations=V%C3%A9lizy-Villacoublay_78140__48.78503_2.18247_3771,Paris__48.86017419624389_2.337177366534126_9370&price=800-1200"
+    search_url = "https://www.leboncoin.fr/recherche?category=8&locations=Saint-Cyr-l%27Ecole_78210__48.79981_2.06753_2578,Issy-les-Moulineaux_92130__48.82123_2.25161_2827,V%C3%A9lizy-Villacoublay_78140__48.78503_2.18247_3771,Paris__48.86017419624389_2.337177366534126_9370&price=800-1200"
     storage_path = "data/raw/leboncoin_htmls"
     detail_storage_path = "data/raw/leboncoin_details_htmls"
     parser = staticmethod(parse_leboncoin_search_html)
