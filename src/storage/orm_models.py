@@ -35,6 +35,9 @@ class RentalListingORM(Base):
     surface_m2: Mapped[float] = mapped_column(Float)
     rooms: Mapped[int | None] = mapped_column(Integer)
     bedrooms: Mapped[int | None] = mapped_column(Integer)
+    floor: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    is_rental: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
     furnished: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     parking: Mapped[bool | None] = mapped_column(Boolean, nullable=True)

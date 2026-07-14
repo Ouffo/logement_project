@@ -16,6 +16,7 @@ from src.utils.scrapping import (
     EXTRA_POSTAL_CODES_PATTERN,
     city_from_postal_code,
     get_next_page_url,
+    parse_floor,
 )
 
 
@@ -170,6 +171,23 @@ FRENCH_MONTHS = {
 }
 
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
+
+
+def parse_bienici_floor(section) -> int | None:
+    for span in section.select(".labelInfo span"):
+        floor = parse_floor(span.get_text(" ", strip=True))
+        if floor is not None:
+            return floor
+
+    # Fallback texte libre : certaines annonces ne renseignent l'étage que
+    # dans la description, pas dans les champs structurés ci-dessus.
+    description_el = section.select_one(".description")
+    if description_el:
+        floor = parse_floor(description_el.get_text(" ", strip=True))
+        if floor is not None:
+            return floor
+
+    return None
 
 
 def get_bienici_energy_section(section):
@@ -456,5 +474,6 @@ class BieniciSource(RentalListingSource):
         listing.energy_class = parse_bienici_energy_class(section=section)
         listing.construction_year = parse_bienici_construction_year(section=section)
         listing.posted_at = parse_bienici_posted_at(section=section)
+        listing.floor = parse_bienici_floor(section=section)
         listing.details_fetched_at = datetime.now(UTC)
         print(f"url: {listing.url}, posted date: {listing.posted_at}")

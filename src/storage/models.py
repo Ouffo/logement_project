@@ -23,6 +23,9 @@ class RentalListing(BaseModel):
     surface_m2: float = Field(gt=0)
     rooms: Optional[int] = None
     bedrooms: Optional[int] = None
+    floor: Optional[int] = None
+
+    is_rental: bool = True
 
     furnished: Optional[bool] = None
     parking: Optional[bool] = None

@@ -7,6 +7,7 @@ from src.ingestion.sources.leboncoin_source import (
     parse_construction_year_from_json_like_text,
     parse_leboncoin_construction_year,
     parse_leboncoin_energy,
+    parse_leboncoin_floor,
     parse_leboncoin_posted_at,
     parse_leboncoin_posted_at_from_json,
     parse_leboncoin_posted_at_from_visible_text,
@@ -141,6 +142,56 @@ def test_parse_leboncoin_energy_dom_fallback():
 
 def test_parse_leboncoin_energy_no_match():
     assert parse_leboncoin_energy("<div>rien</div>") is None
+
+
+def test_parse_leboncoin_floor_from_json():
+    html = '{"key":"floor_number","value":"3","values":["3"],"key_label":"Étage de votre bien"}'
+    assert parse_leboncoin_floor(html) == 3
+
+
+def test_parse_leboncoin_floor_ground_floor_from_json():
+    html = '{"key":"floor_number","value":"0","values":["0"]}'
+    assert parse_leboncoin_floor(html) == 0
+
+
+def test_parse_leboncoin_floor_dom_fallback():
+    html = '<div title="Étage de votre bien"><p title="4">4</p></div>'
+    assert parse_leboncoin_floor(html) == 4
+
+
+def test_parse_leboncoin_floor_dom_fallback_rdc():
+    html = '<div title="Étage de votre bien"><p title="RDC">RDC</p></div>'
+    assert parse_leboncoin_floor(html) == 0
+
+
+def test_parse_leboncoin_floor_no_match():
+    assert parse_leboncoin_floor("<div>rien</div>") is None
+
+
+def test_parse_leboncoin_floor_falls_back_to_description():
+    html = """
+    <div data-qa-id="adview_description_container">
+      Bel appartement situé au 4ème étage d'un immeuble sans ascenseur.
+    </div>
+    """
+    assert parse_leboncoin_floor(html) == 4
+
+
+def test_parse_leboncoin_floor_description_informal_no_suffix():
+    html = """
+    <div data-qa-id="adview_description_container">
+      Situé au 2 étage d'une résidence avec ascenseur, l'appartement est calme.
+    </div>
+    """
+    assert parse_leboncoin_floor(html) == 2
+
+
+def test_parse_leboncoin_floor_prefers_structured_field_over_description():
+    html = """
+    <div title="Étage de votre bien"><p title="5">5</p></div>
+    <div data-qa-id="adview_description_container">au 2ème étage</div>
+    """
+    assert parse_leboncoin_floor(html) == 5
 
 
 def test_parse_construction_year_from_json_like_text():

@@ -12,6 +12,7 @@ from src.ingestion.sources.bienici_source import (
     parse_bienici_energy_class,
     parse_bienici_energy_class_from_json,
     parse_bienici_energy_class_from_rating,
+    parse_bienici_floor,
     parse_bienici_postal_code,
     parse_bienici_posted_at,
     parse_bienici_rooms,
@@ -154,6 +155,41 @@ def test_parse_bienici_energy_class_from_real_section():
 
 def test_parse_bienici_construction_year_from_real_section():
     assert parse_bienici_construction_year(_real_detail_section()) == 1900
+
+
+def test_parse_bienici_floor_from_real_section():
+    # bienici_detail_section_sample.html has "1er étage (sur 3)"
+    assert parse_bienici_floor(_real_detail_section()) == 1
+
+
+def test_parse_bienici_floor_returns_none_without_match():
+    html = '<section><div class="labelInfo"><span>Cave</span></div></section>'
+    section = BeautifulSoup(html, "html.parser").select_one("section")
+
+    assert parse_bienici_floor(section) is None
+
+
+def test_parse_bienici_floor_falls_back_to_description():
+    html = """
+    <section>
+      <div class="labelInfo"><span>Cave</span></div>
+      <section class="description">
+        Au 1er étage, sans ascenseur, appartement lumineux.
+      </section>
+    </section>
+    """
+    section = BeautifulSoup(html, "html.parser").select_one("section")
+
+    assert parse_bienici_floor(section) == 1
+
+
+def test_parse_bienici_floor_ignores_building_total_alone():
+    # "1 étage" here means "this building has 1 floor", not the unit's
+    # own floor — same ambiguity as "N étages" (plural) elsewhere.
+    html = '<section><div class="labelInfo"><span>1 étage</span></div></section>'
+    section = BeautifulSoup(html, "html.parser").select_one("section")
+
+    assert parse_bienici_floor(section) is None
 
 
 def test_parse_bienici_posted_at_from_real_section():

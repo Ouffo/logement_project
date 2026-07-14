@@ -21,6 +21,7 @@ from src.utils.scrapping import (
     city_from_postal_code,
     combine_htmls,
     extract_body_content,
+    parse_floor,
     simulate_scroll,
 )
 
@@ -244,6 +245,7 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
                 surface_m2=surface_m2,
                 rooms=rooms,
                 bedrooms=bedrooms,
+                floor=parse_floor(full_text),
                 furnished="meublée" in title_text.lower()
                 or "meublé" in title_text.lower()
                 or "meublé" in full_text.lower(),

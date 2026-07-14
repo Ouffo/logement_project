@@ -32,6 +32,128 @@ def city_from_postal_code(postal_code: str | None) -> str:
     return POSTAL_CODE_TO_CITY.get(postal_code, "Paris")
 
 
+FRENCH_ORDINAL_WORDS = {
+    "premier": 1,
+    "première": 1,
+    "premiere": 1,
+    "deuxième": 2,
+    "deuxieme": 2,
+    "troisième": 3,
+    "troisieme": 3,
+    "quatrième": 4,
+    "quatrieme": 4,
+    "cinquième": 5,
+    "cinquieme": 5,
+    "sixième": 6,
+    "sixieme": 6,
+    "septième": 7,
+    "septieme": 7,
+    "huitième": 8,
+    "huitieme": 8,
+    "neuvième": 9,
+    "neuvieme": 9,
+    "dixième": 10,
+    "dixieme": 10,
+    "onzième": 11,
+    "onzieme": 11,
+    "douzième": 12,
+    "douzieme": 12,
+    "treizième": 13,
+    "treizieme": 13,
+    "quatorzième": 14,
+    "quatorzieme": 14,
+    "quinzième": 15,
+    "quinzieme": 15,
+    "seizième": 16,
+    "seizieme": 16,
+    "dix-septième": 17,
+    "dix-septieme": 17,
+    "dix-huitième": 18,
+    "dix-huitieme": 18,
+    "dix-neuvième": 19,
+    "dix-neuvieme": 19,
+    "vingtième": 20,
+    "vingtieme": 20,
+}
+
+_FRENCH_ORDINAL_WORDS_PATTERN = "|".join(FRENCH_ORDINAL_WORDS)
+
+
+def _parse_floor_from_sentence(sentence: str) -> int | None:
+    if re.search(r"rez.de.chauss[ée]e|\bRDC\b", sentence, flags=re.IGNORECASE):
+        return 0
+
+    last_floor_match = re.search(
+        r"dernier\s+[eé]tage\s*\(sur\s*(\d+)\)",
+        sentence,
+        flags=re.IGNORECASE,
+    )
+    if last_floor_match:
+        return int(last_floor_match.group(1))
+
+    # "Étage 4/6" (Seloger format: floor/total floors in the building). A
+    # negative floor equal to minus the total (e.g. "-3/3") is a known
+    # Seloger display quirk for the top floor, not a real basement level.
+    ratio_match = re.search(r"[ée]tage\s+(-?\d+)\s*/\s*(\d+)", sentence, flags=re.IGNORECASE)
+    if ratio_match:
+        floor_value = int(ratio_match.group(1))
+        total_floors = int(ratio_match.group(2))
+        return total_floors if floor_value == -total_floors else floor_value
+
+    # "2e étage", "1er étage (sur 3)" — ordinal directly followed by "étage".
+    match = re.search(
+        r"(-?\d+)(?:ᵉʳ|ᵉ|er|ère|[eè]me|e)\s+[eé]tage",
+        sentence,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return int(match.group(1))
+
+    # "au 4ème et dernier étage", "au 3e avec ascenseur" — looser match for
+    # when "étage"/"ascenseur" isn't directly adjacent, gated on the "au"
+    # prefix: real listings phrase the floor as "au <ordinal>", whereas
+    # arrondissement mentions ("dans le 18e") don't use "au" this way.
+    match = re.search(
+        r"\bau\s+(-?\d+)(?:ᵉʳ|ᵉ|er|ère|[eè]me|e)\b(?=.*(?:[eé]tage|ascenseur))",
+        sentence,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return int(match.group(1))
+
+    # "au deuxième étage" — spelled-out ordinals, only next to "étage"
+    # since these words aren't used for arrondissements.
+    word_match = re.search(
+        rf"\b({_FRENCH_ORDINAL_WORDS_PATTERN})\b\s+[eé]tage",
+        sentence,
+        flags=re.IGNORECASE,
+    )
+    if word_match:
+        return FRENCH_ORDINAL_WORDS[word_match.group(1).lower()]
+
+    # "au 2 étage" — informal writing that drops the ordinal suffix
+    # entirely. Requires "au" + singular "étage" right after the number
+    # (not "étages", which is the building's total floor count), so it
+    # doesn't collide with dates like "au 15 juillet".
+    bare_match = re.search(r"\bau\s+(-?\d+)\s+[eé]tage\b", sentence, flags=re.IGNORECASE)
+    if bare_match:
+        return int(bare_match.group(1))
+
+    return None
+
+
+def parse_floor(text: str | None) -> int | None:
+    if not text:
+        return None
+
+    for sentence in re.split(r"[.\n]", text):
+        floor = _parse_floor_from_sentence(sentence)
+        if floor is not None:
+            return floor
+
+    return None
+
+
 def dismiss_cookie_banner(page):
     page.wait_for_timeout(2000)  # Wait for 2 seconds to ensure the cookie banner is loaded
     # cookie_btn = (

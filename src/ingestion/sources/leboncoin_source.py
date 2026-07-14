@@ -21,6 +21,7 @@ from src.utils.scrapping import (
     EXTRA_POSTAL_CODES_PATTERN,
     city_from_postal_code,
     get_next_page_url,
+    parse_floor,
 )
 
 from .base import RentalListingSource
@@ -141,6 +142,34 @@ def parse_surface_m2(text: str) -> float | None:
 
 
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
+
+
+def parse_leboncoin_floor(html: str) -> int | None:
+    # 1. Le plus fiable : JSON embarqué Leboncoin
+    match = re.search(r'"key"\s*:\s*"floor_number"\s*,\s*"value"\s*:\s*"(-?\d+)"', html)
+    if match:
+        return int(match.group(1))
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    # 2. Fallback DOM visible (champ structuré "Étage de votre bien")
+    block = soup.select_one('div[title="Étage de votre bien"]')
+    if block:
+        value = block.get_text(strip=True)
+        if value.upper() == "RDC":
+            return 0
+        if re.fullmatch(r"-?\d+", value):
+            return int(value)
+
+    # 3. Fallback texte libre : certaines annonces ne renseignent l'étage
+    # que dans la description, pas dans le champ structuré ci-dessus.
+    description_el = soup.select_one('[data-qa-id="adview_description_container"]')
+    if description_el:
+        floor = parse_floor(description_el.get_text(" ", strip=True))
+        if floor is not None:
+            return floor
+
+    return None
 
 
 def parse_leboncoin_energy(html: str) -> str | None:
@@ -465,5 +494,6 @@ class LeboncoinSource(RentalListingSource):
         listing.energy_class = parse_leboncoin_energy(html)
         listing.construction_year = parse_leboncoin_construction_year(html)
         listing.posted_at = parse_leboncoin_posted_at(html)
+        listing.floor = parse_leboncoin_floor(html)
         listing.details_fetched_at = datetime.now(UTC)
         print(f"url: {listing.url}, posted date: {listing.posted_at}")

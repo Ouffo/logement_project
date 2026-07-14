@@ -21,6 +21,7 @@ from src.utils.scrapping import (
     EXTRA_CITY_NAMES_PATTERN,
     EXTRA_POSTAL_CODES_PATTERN,
     city_from_postal_code,
+    parse_floor,
 )
 
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
@@ -86,17 +87,6 @@ def parse_rooms(text: str | None) -> int | None:
         return None
 
     match = re.search(r"(\d+)\s*pi[eè]ce", text, flags=re.IGNORECASE)
-    return int(match.group(1)) if match else None
-
-
-def parse_floor(text: str | None) -> int | None:
-    if not text:
-        return None
-
-    if re.search(r"rez.de.chauss[ée]e", text, flags=re.IGNORECASE):
-        return 0
-
-    match = re.search(r"(\d+)(?:er|[eè]me|e)\s+[eé]tage", text, flags=re.IGNORECASE)
     return int(match.group(1)) if match else None
 
 

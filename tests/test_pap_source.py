@@ -53,6 +53,7 @@ def test_parse_pap_detail_html_specific_listing_fields():
     assert listing.surface_m2 == 26.0
     assert listing.rooms == 2
     assert listing.city == "Paris"
+    assert listing.floor == 1
 
 
 def test_parse_pap_detail_html_skips_section_without_url():
