@@ -306,6 +306,7 @@ def load_listings() -> pd.DataFrame:
                 {
                     "source": listing.source,
                     "title": listing.title,
+                    "is_rental": listing.is_rental,
                     "city": listing.city,
                     "postal_code": listing.postal_code,
                     "price_eur": listing.price_eur,
@@ -357,6 +358,10 @@ def render_energy_label(energy_class: str) -> str:
     """
 
 
+def _display_source(source: str) -> str:
+    return source.removesuffix("_sale") if isinstance(source, str) else source
+
+
 def score_class(score):
     if score is None:
         return "mid"
@@ -371,7 +376,8 @@ def render_card(row):
     image_url = row.get("image_url")
     has_image = pd.notna(image_url) and isinstance(image_url, str) and image_url.startswith("http")
 
-    source = row.get("source") or ""
+    source = _display_source(row.get("source") or "")
+    is_rental_row = row.get("is_rental", True)
     price = row.get("price_eur")
     surface = row.get("surface_m2")
     rooms = row.get("rooms")
@@ -386,7 +392,8 @@ def render_card(row):
     construction_year = row.get("construction_year")
     posted_at = row.get("posted_at")
 
-    price_str = f"{int(price)} €" if pd.notna(price) else "— €"
+    price_str = f"{int(price):,}".replace(",", " ") + " €" if pd.notna(price) else "— €"
+    price_suffix = " <span>/ mois</span>" if is_rental_row else ""
     surface_str = f"{int(surface)} m²" if pd.notna(surface) else "— m²"
     rooms_str = (
         f"{int(rooms)} pièce{'s' if rooms and rooms > 1 else ''}" if pd.notna(rooms) else "—"
@@ -432,7 +439,7 @@ def render_card(row):
         </div>
         <div class="listing-info">
             <div>
-                <div class="listing-price">{price_str} <span>/ mois</span></div>
+                <div class="listing-price">{price_str}{price_suffix}</div>
                 <div class="listing-specs">
                     {surface_str}
                     <span class="sep">·</span>
@@ -466,6 +473,15 @@ if df.empty:
     st.warning("Aucune annonce en base pour l'instant.")
     st.stop()
 
+# ── Mode toggle (location / achat) ────────────────────────────────────────────
+mode = st.radio("Mode", ["Location", "Achat"], horizontal=True, label_visibility="collapsed")
+is_rental_mode = mode == "Location"
+df = df[df["is_rental"] == is_rental_mode].reset_index(drop=True)
+
+if df.empty:
+    st.info(f"Aucune annonce en {'location' if is_rental_mode else 'achat'} pour l'instant.")
+    st.stop()
+
 # ── Last update timestamp ─────────────────────────────────────────────────────
 _last_update = df["last_seen_at"].dropna().max()
 with _h2:
@@ -496,11 +512,17 @@ df = df.sort_values("score", ascending=False, na_position="last").drop(
 with st.container():
     c1, c2, c3, c4 = st.columns([2, 2, 2, 2])
     with c1:
-        max_price = st.slider("Budget max (€/mois)", 0, 2000, 1200, 50)
+        if is_rental_mode:
+            max_price = st.slider("Budget max (€/mois)", 0, 2000, 1200, 50)
+        else:
+            max_price = st.slider("Budget max (€)", 0, 1_000_000, 650_000, 10_000)
     with c2:
-        min_surface = st.slider("Surface min (m²)", 0, 100, 25, 5)
+        if is_rental_mode:
+            min_surface = st.slider("Surface min (m²)", 0, 100, 25, 5)
+        else:
+            min_surface = st.slider("Surface min (m²)", 0, 200, 50, 5)
     with c3:
-        source_opts = ["Toutes"] + sorted(df["source"].dropna().unique().tolist())
+        source_opts = ["Toutes"] + sorted({_display_source(s) for s in df["source"].dropna()})
         source = st.selectbox("Source", source_opts)
     with c4:
         city_opts = ["Tous"] + sorted(df["city"].dropna().unique().tolist())
@@ -524,7 +546,7 @@ with st.container():
 # ── Filtering ────────────────────────────────────────────────────────────────
 filtered = df[(df["price_eur"] <= max_price) & (df["surface_m2"] >= min_surface)]
 if source != "Toutes":
-    filtered = filtered[filtered["source"] == source]
+    filtered = filtered[filtered["source"].apply(_display_source) == source]
 
 if city_filter != "Tous":
     filtered = filtered[filtered["city"] == city_filter]

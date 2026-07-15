@@ -6,7 +6,6 @@ from src.ingestion.sources.seloger_source import (
     clean_url,
     parse_available_at,
     parse_district_name,
-    parse_floor,
     parse_postal_code,
     parse_price_eur,
     parse_rooms,
@@ -41,38 +40,6 @@ def test_parse_price_eur_with_nbsp_separators():
     # thousands and a regular no-break space (U+00A0) before the currency sign
     price_str = "1" + chr(0x202F) + "178" + chr(0xA0) + "€ /mois"
     assert parse_price_eur(price_str) == 1178
-
-
-def test_parse_floor_none_input():
-    assert parse_floor(None) is None
-
-
-def test_parse_floor_no_match():
-    assert parse_floor("sans info") is None
-
-
-def test_parse_floor_eme_suffix():
-    assert parse_floor("3ème étage") == 3
-
-
-def test_parse_floor_er_suffix():
-    assert parse_floor("1er étage") == 1
-
-
-def test_parse_floor_e_suffix():
-    assert parse_floor("2e étage") == 2
-
-
-def test_parse_floor_rez_de_chaussee_returns_zero():
-    assert parse_floor("rez-de-chaussée") == 0
-
-
-def test_parse_floor_rez_de_chaussee_without_accent():
-    assert parse_floor("rez-de-chaussee") == 0
-
-
-def test_parse_floor_accepts_unaccented_text():
-    assert parse_floor("3eme etage") == 3
 
 
 def test_clean_text_collapses_whitespace_and_nbsp():
@@ -185,6 +152,11 @@ def test_parse_title_matches_known_property_types():
     assert parse_title("Studio à louer proche métro") == "Studio à louer"
 
 
+def test_parse_title_matches_sale_listings():
+    assert parse_title("Appartement à vendre Champerret-Berthier") == "Appartement à vendre"
+    assert parse_title("Studio à vendre proche métro") == "Studio à vendre"
+
+
 def test_parse_title_no_match():
     assert parse_title("Maison individuelle avec jardin") is None
 
@@ -228,6 +200,18 @@ def test_parse_seloger_search_html_specific_listing_fields():
     assert listing.rooms == 1
     assert listing.postal_code == "75013"
     assert listing.energy_class == "C"
+    assert listing.floor == 7
+    assert listing.is_top_floor is None
+
+
+def test_parse_seloger_search_html_detects_non_top_floor():
+    html = _read_fixture("seloger_search_sample.html")
+
+    listings = {listing.source_id: listing for listing in parse_seloger_search_html(html)}
+
+    listing = listings["273449163"]
+    assert listing.floor == 2
+    assert listing.is_top_floor is False
 
 
 def test_parse_seloger_search_html_deduplicates_by_source_id():

@@ -146,26 +146,28 @@ def test_parse_leboncoin_energy_no_match():
 
 def test_parse_leboncoin_floor_from_json():
     html = '{"key":"floor_number","value":"3","values":["3"],"key_label":"Étage de votre bien"}'
-    assert parse_leboncoin_floor(html) == 3
+    assert parse_leboncoin_floor(html).floor == 3
 
 
 def test_parse_leboncoin_floor_ground_floor_from_json():
     html = '{"key":"floor_number","value":"0","values":["0"]}'
-    assert parse_leboncoin_floor(html) == 0
+    assert parse_leboncoin_floor(html).floor == 0
 
 
 def test_parse_leboncoin_floor_dom_fallback():
     html = '<div title="Étage de votre bien"><p title="4">4</p></div>'
-    assert parse_leboncoin_floor(html) == 4
+    assert parse_leboncoin_floor(html).floor == 4
 
 
 def test_parse_leboncoin_floor_dom_fallback_rdc():
     html = '<div title="Étage de votre bien"><p title="RDC">RDC</p></div>'
-    assert parse_leboncoin_floor(html) == 0
+    assert parse_leboncoin_floor(html).floor == 0
 
 
 def test_parse_leboncoin_floor_no_match():
-    assert parse_leboncoin_floor("<div>rien</div>") is None
+    info = parse_leboncoin_floor("<div>rien</div>")
+    assert info.floor is None
+    assert info.is_top_floor is None
 
 
 def test_parse_leboncoin_floor_falls_back_to_description():
@@ -174,7 +176,7 @@ def test_parse_leboncoin_floor_falls_back_to_description():
       Bel appartement situé au 4ème étage d'un immeuble sans ascenseur.
     </div>
     """
-    assert parse_leboncoin_floor(html) == 4
+    assert parse_leboncoin_floor(html).floor == 4
 
 
 def test_parse_leboncoin_floor_description_informal_no_suffix():
@@ -183,7 +185,7 @@ def test_parse_leboncoin_floor_description_informal_no_suffix():
       Situé au 2 étage d'une résidence avec ascenseur, l'appartement est calme.
     </div>
     """
-    assert parse_leboncoin_floor(html) == 2
+    assert parse_leboncoin_floor(html).floor == 2
 
 
 def test_parse_leboncoin_floor_prefers_structured_field_over_description():
@@ -191,7 +193,18 @@ def test_parse_leboncoin_floor_prefers_structured_field_over_description():
     <div title="Étage de votre bien"><p title="5">5</p></div>
     <div data-qa-id="adview_description_container">au 2ème étage</div>
     """
-    assert parse_leboncoin_floor(html) == 5
+    assert parse_leboncoin_floor(html).floor == 5
+
+
+def test_parse_leboncoin_floor_description_detects_top_floor():
+    html = """
+    <div data-qa-id="adview_description_container">
+      Idéalement situé au dernier étage d'une résidence paisible.
+    </div>
+    """
+    info = parse_leboncoin_floor(html)
+    assert info.floor is None
+    assert info.is_top_floor is True
 
 
 def test_parse_construction_year_from_json_like_text():

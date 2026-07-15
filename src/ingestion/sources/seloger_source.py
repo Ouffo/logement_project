@@ -21,7 +21,7 @@ from src.utils.scrapping import (
     EXTRA_CITY_NAMES_PATTERN,
     EXTRA_POSTAL_CODES_PATTERN,
     city_from_postal_code,
-    parse_floor,
+    parse_floor_info,
 )
 
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
@@ -136,12 +136,12 @@ def parse_title(text: str | None) -> str | None:
         return None
 
     patterns = [
-        r"(Appartement à louer)",
-        r"(Studio à louer)",
-        r"(Maison à louer)",
-        r"(Loft à louer)",
-        r"(Duplex à louer)",
-        r"(Chambre à louer)",
+        r"(Appartement à (?:louer|vendre))",
+        r"(Studio à (?:louer|vendre))",
+        r"(Maison à (?:louer|vendre))",
+        r"(Loft à (?:louer|vendre))",
+        r"(Duplex à (?:louer|vendre))",
+        r"(Chambre à (?:louer|vendre))",
     ]
 
     for pattern in patterns:
@@ -152,7 +152,11 @@ def parse_title(text: str | None) -> str | None:
     return None
 
 
-def parse_seloger_card(card) -> RentalListing | None:
+def parse_seloger_card(
+    card,
+    source: str = "seloger",
+    is_rental: bool = True,
+) -> RentalListing | None:
     card_id = card.get("id")
 
     link = card.select_one('[data-testid="card-mfe-covering-link-testid"]')
@@ -204,9 +208,10 @@ def parse_seloger_card(card) -> RentalListing | None:
         return None
 
     postal_code = parse_postal_code(header_text or full_text)
+    floor_info = parse_floor_info(keyfacts or full_text)
 
     return RentalListing(
-        source="seloger",
+        source=source,
         source_id=source_id,
         url=HttpUrl(url) if url else None,
         title=title,
@@ -219,7 +224,9 @@ def parse_seloger_card(card) -> RentalListing | None:
         surface_m2=parse_surface_m2(keyfacts or full_text),
         rooms=parse_rooms(keyfacts or full_text),
         bedrooms=None,
-        floor=parse_floor(keyfacts or full_text),
+        is_rental=is_rental,
+        floor=floor_info.floor,
+        is_top_floor=floor_info.is_top_floor,
         furnished="meublé" in (description or "").lower(),
         parking="parking" in (description or full_text or "").lower(),
         quiet="calme" in (description or full_text or "").lower(),
@@ -229,7 +236,11 @@ def parse_seloger_card(card) -> RentalListing | None:
     )
 
 
-def parse_seloger_search_html(html: str) -> list[RentalListing]:
+def parse_seloger_search_html(
+    html: str,
+    source: str = "seloger",
+    is_rental: bool = True,
+) -> list[RentalListing]:
     soup = BeautifulSoup(html, "html.parser")
 
     cards = soup.select('[data-testid="serp-core-classified-card-testid"]')
@@ -238,7 +249,7 @@ def parse_seloger_search_html(html: str) -> list[RentalListing]:
     seen_ids = set()
 
     for card in cards:
-        listing = parse_seloger_card(card)
+        listing = parse_seloger_card(card, source=source, is_rental=is_rental)
 
         if listing is None:
             continue
@@ -330,3 +341,19 @@ class SeLogerSource(RentalListingSource):
         html: str,
     ):
         return None
+
+
+def parse_seloger_sale_search_html(html: str) -> list[RentalListing]:
+    return parse_seloger_search_html(html, source="seloger_sale", is_rental=False)
+
+
+class SeLogerSaleSource(SeLogerSource):
+    name = "seloger_sale"
+    search_url = (
+        "https://www.seloger.com/classified-search?distributionTypes=Buy&estateTypes=Apartment"
+        "&featuresIncluded=Elevator&locations=AD08FR31096&locationsInBuildingIncluded=Roof_Storey"
+        "&numberOfRoomsMin=3&priceMax=650000&spaceMin=50"
+    )
+    storage_path = "data/raw/seloger_sale_htmls"
+    detail_storage_path = "data/raw/seloger_sale_details_htmls"
+    parser = staticmethod(parse_seloger_sale_search_html)

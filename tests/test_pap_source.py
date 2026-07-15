@@ -54,6 +54,7 @@ def test_parse_pap_detail_html_specific_listing_fields():
     assert listing.rooms == 2
     assert listing.city == "Paris"
     assert listing.floor == 1
+    assert listing.is_top_floor is None
 
 
 def test_parse_pap_detail_html_skips_section_without_url():
@@ -71,6 +72,42 @@ def test_parse_pap_detail_html_skips_section_without_surface():
     """
 
     assert parse_pap_detail_html(html) == []
+
+
+def test_parse_pap_detail_html_ignores_price_per_m2_fact():
+    # Sale listings show a "X € le m²" fact alongside the real surface;
+    # both contain "m²" so the price-per-m² one must not overwrite surface.
+    html = """
+    <section class="listing-detail" data-url="https://www.pap.fr/annonces/x-r1">
+        <h1>Vente appartement <span>500 000 €</span></h1>
+        <h2>Paris 75011</h2>
+        <strong>3 pièces</strong>
+        <strong>51 m²</strong>
+        <strong>9.803 € le m²</strong>
+    </section>
+    """
+
+    listings = parse_pap_detail_html(html)
+
+    assert listings[0].surface_m2 == 51.0
+
+
+def test_parse_pap_detail_html_ignores_price_per_m2_fact_spelled_out_currency():
+    # Same as above, but with "euros" spelled out instead of "€" — the
+    # exclusion must not depend on the currency symbol specifically.
+    html = """
+    <section class="listing-detail" data-url="https://www.pap.fr/annonces/x-r1">
+        <h1>Vente appartement <span>500 000 €</span></h1>
+        <h2>Paris 75011</h2>
+        <strong>3 pièces</strong>
+        <strong>51 m²</strong>
+        <strong>9 803 euros le m²</strong>
+    </section>
+    """
+
+    listings = parse_pap_detail_html(html)
+
+    assert listings[0].surface_m2 == 51.0
 
 
 def test_parse_pap_html_extracts_search_result_listing():

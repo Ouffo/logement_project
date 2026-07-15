@@ -21,7 +21,7 @@ from src.utils.scrapping import (
     city_from_postal_code,
     combine_htmls,
     extract_body_content,
-    parse_floor,
+    parse_floor_info,
     simulate_scroll,
 )
 
@@ -74,6 +74,15 @@ def parse_pap_html(html: str) -> list[RentalListing]:
                 surface_m2 = parse_surface(tag)
 
         relative_url = title_el.get("href")
+
+        if relative_url.startswith("http"):
+            # "Programme neuf" listings link out to an external partner
+            # site (e.g. immoneuf.com) with an already-absolute URL and a
+            # page structure we don't parse — skip rather than mangle it
+            # into a broken "pap.fr" + external URL.
+            logger.info(f"Skipping external PAP listing: {relative_url}")
+            continue
+
         source_id = relative_url.split("-")[-1]
         image_el = item.select_one("img")
 
@@ -161,7 +170,11 @@ def parse_pap_energy_class(section) -> str | None:
     return active.get_text(strip=True) if active else None
 
 
-def parse_pap_detail_html(html: str) -> list[RentalListing]:
+def parse_pap_detail_html(
+    html: str,
+    source: str = "pap",
+    is_rental: bool = True,
+) -> list[RentalListing]:
     soup = BeautifulSoup(html, "html.parser")
 
     listings = []
@@ -208,7 +221,11 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
                 rooms = parse_leading_int(value)
             elif "chambre" in value_lower:
                 bedrooms = parse_leading_int(value)
-            elif "m²" in value_lower:
+            elif "m²" in value_lower and not re.search(r"(le|par|/)\s*m²", value_lower):
+                # Sale listings also show a price-per-m² fact ("9.803 € le
+                # m²" or similar), which contains "m²" too — a real surface
+                # is never phrased as a rate ("le"/"par"/"/" m²), so this
+                # excludes it regardless of how the currency is written.
                 surface_m2 = parse_surface(value)
 
         if surface_m2 is None:
@@ -229,10 +246,11 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
         postal_code = postal_code_match.group(1) if postal_code_match else None
 
         posted_at = parse_pap_posted_at(full_text)
+        floor_info = parse_floor_info(full_text)
 
         listings.append(
             RentalListing(
-                source="pap",
+                source=source,
                 source_id=parse_pap_source_id(url),
                 url=url,
                 title=title_text,
@@ -245,7 +263,9 @@ def parse_pap_detail_html(html: str) -> list[RentalListing]:
                 surface_m2=surface_m2,
                 rooms=rooms,
                 bedrooms=bedrooms,
-                floor=parse_floor(full_text),
+                is_rental=is_rental,
+                floor=floor_info.floor,
+                is_top_floor=floor_info.is_top_floor,
                 furnished="meublée" in title_text.lower()
                 or "meublé" in title_text.lower()
                 or "meublé" in full_text.lower(),
@@ -349,3 +369,15 @@ class PapSource(RentalListingSource):
         __: str,
     ):
         return None
+
+
+def parse_pap_sale_detail_html(html: str) -> list[RentalListing]:
+    return parse_pap_detail_html(html, source="pap_sale", is_rental=False)
+
+
+class PapSaleSource(PapSource):
+    name = "pap_sale"
+    search_url = "https://www.pap.fr/annonce/vente-appartements-paris-75-g439-3-pieces-jusqu-a-650000-euros-a-partir-de-50-m2"
+    storage_path = "data/raw/pap_sale_htmls"
+    detail_storage_path = None
+    parser = staticmethod(parse_pap_sale_detail_html)

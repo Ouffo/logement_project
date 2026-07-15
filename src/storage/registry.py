@@ -1,7 +1,7 @@
-from src.ingestion.sources.bienici_source import BieniciSource
+from src.ingestion.sources.bienici_source import BieniciSaleSource, BieniciSource
 from src.ingestion.sources.leboncoin_source import LeboncoinSource
-from src.ingestion.sources.pap_source import PapSource
-from src.ingestion.sources.seloger_source import SeLogerSource
+from src.ingestion.sources.pap_source import PapSaleSource, PapSource
+from src.ingestion.sources.seloger_source import SeLogerSaleSource, SeLogerSource
 
 
 def _lock_id(name: str) -> int:
@@ -15,6 +15,9 @@ SOURCE_REGISTRY = {
     "leboncoin": LeboncoinSource,
     "bienici": BieniciSource,
     "seloger": SeLogerSource,
+    "bienici_sale": BieniciSaleSource,
+    "pap_sale": PapSaleSource,
+    "seloger_sale": SeLogerSaleSource,
 }
 
 FETCH_SOURCE_LOCK_IDS = {"fetch_" + name: _lock_id("fetch_" + name) for name in SOURCE_REGISTRY}

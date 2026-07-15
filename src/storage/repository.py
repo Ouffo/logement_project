@@ -44,6 +44,7 @@ def save_listing(
     db_listing.rooms = listing.rooms
     db_listing.bedrooms = listing.bedrooms
     db_listing.floor = listing.floor
+    db_listing.is_top_floor = listing.is_top_floor
     db_listing.is_rental = listing.is_rental
     db_listing.furnished = listing.furnished
     db_listing.parking = listing.parking

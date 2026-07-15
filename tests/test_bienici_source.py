@@ -159,14 +159,18 @@ def test_parse_bienici_construction_year_from_real_section():
 
 def test_parse_bienici_floor_from_real_section():
     # bienici_detail_section_sample.html has "1er étage (sur 3)"
-    assert parse_bienici_floor(_real_detail_section()) == 1
+    info = parse_bienici_floor(_real_detail_section())
+    assert info.floor == 1
+    assert info.is_top_floor is False
 
 
 def test_parse_bienici_floor_returns_none_without_match():
     html = '<section><div class="labelInfo"><span>Cave</span></div></section>'
     section = BeautifulSoup(html, "html.parser").select_one("section")
 
-    assert parse_bienici_floor(section) is None
+    info = parse_bienici_floor(section)
+    assert info.floor is None
+    assert info.is_top_floor is None
 
 
 def test_parse_bienici_floor_falls_back_to_description():
@@ -180,7 +184,7 @@ def test_parse_bienici_floor_falls_back_to_description():
     """
     section = BeautifulSoup(html, "html.parser").select_one("section")
 
-    assert parse_bienici_floor(section) == 1
+    assert parse_bienici_floor(section).floor == 1
 
 
 def test_parse_bienici_floor_ignores_building_total_alone():
@@ -189,7 +193,18 @@ def test_parse_bienici_floor_ignores_building_total_alone():
     html = '<section><div class="labelInfo"><span>1 étage</span></div></section>'
     section = BeautifulSoup(html, "html.parser").select_one("section")
 
-    assert parse_bienici_floor(section) is None
+    info = parse_bienici_floor(section)
+    assert info.floor is None
+    assert info.is_top_floor is None
+
+
+def test_parse_bienici_floor_detects_top_floor():
+    html = '<section><div class="labelInfo"><span>Dernier étage (sur 5)</span></div></section>'
+    section = BeautifulSoup(html, "html.parser").select_one("section")
+
+    info = parse_bienici_floor(section)
+    assert info.floor == 5
+    assert info.is_top_floor is True
 
 
 def test_parse_bienici_posted_at_from_real_section():

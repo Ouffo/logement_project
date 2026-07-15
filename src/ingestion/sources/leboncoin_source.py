@@ -19,9 +19,10 @@ from src.utils.logger import logger
 from src.utils.scrapping import (
     EXTRA_CITY_NAMES_PATTERN,
     EXTRA_POSTAL_CODES_PATTERN,
+    FloorInfo,
     city_from_postal_code,
     get_next_page_url,
-    parse_floor,
+    parse_floor_info,
 )
 
 from .base import RentalListingSource
@@ -144,11 +145,11 @@ def parse_surface_m2(text: str) -> float | None:
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
 
 
-def parse_leboncoin_floor(html: str) -> int | None:
+def parse_leboncoin_floor(html: str) -> FloorInfo:
     # 1. Le plus fiable : JSON embarqué Leboncoin
     match = re.search(r'"key"\s*:\s*"floor_number"\s*,\s*"value"\s*:\s*"(-?\d+)"', html)
     if match:
-        return int(match.group(1))
+        return FloorInfo(floor=int(match.group(1)), is_top_floor=None)
 
     soup = BeautifulSoup(html, "html.parser")
 
@@ -157,19 +158,19 @@ def parse_leboncoin_floor(html: str) -> int | None:
     if block:
         value = block.get_text(strip=True)
         if value.upper() == "RDC":
-            return 0
+            return FloorInfo(floor=0, is_top_floor=None)
         if re.fullmatch(r"-?\d+", value):
-            return int(value)
+            return FloorInfo(floor=int(value), is_top_floor=None)
 
     # 3. Fallback texte libre : certaines annonces ne renseignent l'étage
     # que dans la description, pas dans le champ structuré ci-dessus.
     description_el = soup.select_one('[data-qa-id="adview_description_container"]')
     if description_el:
-        floor = parse_floor(description_el.get_text(" ", strip=True))
-        if floor is not None:
-            return floor
+        info = parse_floor_info(description_el.get_text(" ", strip=True))
+        if info.floor is not None or info.is_top_floor is not None:
+            return info
 
-    return None
+    return FloorInfo(floor=None, is_top_floor=None)
 
 
 def parse_leboncoin_energy(html: str) -> str | None:
@@ -494,6 +495,8 @@ class LeboncoinSource(RentalListingSource):
         listing.energy_class = parse_leboncoin_energy(html)
         listing.construction_year = parse_leboncoin_construction_year(html)
         listing.posted_at = parse_leboncoin_posted_at(html)
-        listing.floor = parse_leboncoin_floor(html)
+        floor_info = parse_leboncoin_floor(html)
+        listing.floor = floor_info.floor
+        listing.is_top_floor = floor_info.is_top_floor
         listing.details_fetched_at = datetime.now(UTC)
         print(f"url: {listing.url}, posted date: {listing.posted_at}")

@@ -1,6 +1,6 @@
 from typing import Union
 
-from src.config.search_criteria import SEARCH_CRITERIA
+from src.config.search_criteria import get_search_criteria
 from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 
@@ -15,7 +15,7 @@ def compute_price_score(listing: AnyListing) -> float:
     if not listing.price_eur:
         return 0
 
-    max_price = SEARCH_CRITERIA["max_price"]
+    max_price = get_search_criteria(getattr(listing, "is_rental", True))["max_price"]
 
     if listing.price_eur >= max_price:
         return 0
@@ -29,7 +29,7 @@ def compute_surface_score(listing: AnyListing) -> float:
     if not listing.surface_m2:
         return 0
 
-    min_surface = SEARCH_CRITERIA["min_surface_m2"]
+    min_surface = get_search_criteria(getattr(listing, "is_rental", True))["min_surface_m2"]
 
     if listing.surface_m2 < min_surface:
         return 0
@@ -40,21 +40,25 @@ def compute_surface_score(listing: AnyListing) -> float:
 
 
 def compute_room_score(listing: AnyListing) -> float:
-    if listing.rooms and listing.rooms >= SEARCH_CRITERIA["min_rooms"]:
+    min_rooms = get_search_criteria(getattr(listing, "is_rental", True))["min_rooms"]
+
+    if listing.rooms and listing.rooms >= min_rooms:
         return 10
 
     return 5
 
 
 def compute_location_score(listing: AnyListing) -> float:
-    if listing.postal_code in SEARCH_CRITERIA["preferred_areas"]:
+    preferred_areas = get_search_criteria(getattr(listing, "is_rental", True))["preferred_areas"]
+
+    if listing.postal_code in preferred_areas:
         return 20
 
     return 5
 
 
 def compute_preferences_score(listing: AnyListing) -> float:
-    prefs = SEARCH_CRITERIA["preferences"]
+    prefs = get_search_criteria(getattr(listing, "is_rental", True))["preferences"]
     score = 0
 
     if prefs["furnished"] and listing.furnished:
@@ -77,6 +81,12 @@ def compute_image_score(listing) -> float:
 
 
 def compute_suspicion_penalty(listing: AnyListing) -> float:
+    if not getattr(listing, "is_rental", True):
+        # These scam heuristics are tuned for monthly-rent price/m² scales
+        # and don't transfer to purchase prices; skip until there's a
+        # purchase-specific basis for them.
+        return 0
+
     if not listing.price_eur or not listing.surface_m2:
         return 0
 

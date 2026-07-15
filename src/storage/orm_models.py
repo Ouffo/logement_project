@@ -36,6 +36,7 @@ class RentalListingORM(Base):
     rooms: Mapped[int | None] = mapped_column(Integer)
     bedrooms: Mapped[int | None] = mapped_column(Integer)
     floor: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_top_floor: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     is_rental: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 

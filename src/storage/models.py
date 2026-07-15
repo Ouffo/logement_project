@@ -24,6 +24,7 @@ class RentalListing(BaseModel):
     rooms: Optional[int] = None
     bedrooms: Optional[int] = None
     floor: Optional[int] = None
+    is_top_floor: Optional[bool] = None
 
     is_rental: bool = True
 

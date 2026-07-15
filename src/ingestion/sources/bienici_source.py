@@ -14,13 +14,18 @@ from src.storage.repository import clean_htmls
 from src.utils.logger import logger
 from src.utils.scrapping import (
     EXTRA_POSTAL_CODES_PATTERN,
+    FloorInfo,
     city_from_postal_code,
     get_next_page_url,
-    parse_floor,
+    parse_floor_info,
 )
 
 
-def parse_bienici_search_html(html: str) -> list[RentalListing]:
+def parse_bienici_search_html(
+    html: str,
+    source: str = "bienici",
+    is_rental: bool = True,
+) -> list[RentalListing]:
     soup = BeautifulSoup(html, "html.parser")
 
     listings = []
@@ -73,7 +78,7 @@ def parse_bienici_search_html(html: str) -> list[RentalListing]:
         full_text = f"{title}\n{address or ''}\n{description or ''}"
 
         listing = RentalListing(
-            source="bienici",
+            source=source,
             source_id=source_id,
             url=url,
             title=title,
@@ -88,6 +93,7 @@ def parse_bienici_search_html(html: str) -> list[RentalListing]:
             surface_m2=surface_m2,
             rooms=rooms,
             bedrooms=None,
+            is_rental=is_rental,
             furnished=("meublé" in full_text.lower() or "meublée" in full_text.lower()),
             parking="parking" in full_text.lower(),
             quiet=("calme" in full_text.lower() or "silencieux" in full_text.lower()),
@@ -173,21 +179,21 @@ FRENCH_MONTHS = {
 ENERGY_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
 
 
-def parse_bienici_floor(section) -> int | None:
+def parse_bienici_floor(section) -> FloorInfo:
     for span in section.select(".labelInfo span"):
-        floor = parse_floor(span.get_text(" ", strip=True))
-        if floor is not None:
-            return floor
+        info = parse_floor_info(span.get_text(" ", strip=True))
+        if info.floor is not None or info.is_top_floor is not None:
+            return info
 
     # Fallback texte libre : certaines annonces ne renseignent l'étage que
     # dans la description, pas dans les champs structurés ci-dessus.
     description_el = section.select_one(".description")
     if description_el:
-        floor = parse_floor(description_el.get_text(" ", strip=True))
-        if floor is not None:
-            return floor
+        info = parse_floor_info(description_el.get_text(" ", strip=True))
+        if info.floor is not None or info.is_top_floor is not None:
+            return info
 
-    return None
+    return FloorInfo(floor=None, is_top_floor=None)
 
 
 def get_bienici_energy_section(section):
@@ -474,6 +480,20 @@ class BieniciSource(RentalListingSource):
         listing.energy_class = parse_bienici_energy_class(section=section)
         listing.construction_year = parse_bienici_construction_year(section=section)
         listing.posted_at = parse_bienici_posted_at(section=section)
-        listing.floor = parse_bienici_floor(section=section)
+        floor_info = parse_bienici_floor(section=section)
+        listing.floor = floor_info.floor
+        listing.is_top_floor = floor_info.is_top_floor
         listing.details_fetched_at = datetime.now(UTC)
         print(f"url: {listing.url}, posted date: {listing.posted_at}")
+
+
+def parse_bienici_sale_search_html(html: str) -> list[RentalListing]:
+    return parse_bienici_search_html(html, source="bienici_sale", is_rental=False)
+
+
+class BieniciSaleSource(BieniciSource):
+    name = "bienici_sale"
+    search_url = "https://www.bienici.com/recherche/achat/paris-75000/3-pieces-et-plus?prix-max=650000&surface-min=50&ascenseur=oui&dernier-etage=oui&camera=12_2.3631944_48.8710077_0_0"
+    storage_path = "data/raw/bienici_sale_htmls"
+    detail_storage_path = "data/raw/bienici_sale_details_htmls"
+    parser = staticmethod(parse_bienici_sale_search_html)
