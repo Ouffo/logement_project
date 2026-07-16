@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+from bs4 import BeautifulSoup
+
 from src.ingestion.sources.seloger_source import (
     clean_text,
     clean_url,
@@ -9,6 +11,7 @@ from src.ingestion.sources.seloger_source import (
     parse_postal_code,
     parse_price_eur,
     parse_rooms,
+    parse_seloger_card,
     parse_seloger_search_html,
     parse_seloger_source_id,
     parse_surface_m2,
@@ -150,6 +153,38 @@ def test_parse_district_name_no_match():
 def test_parse_title_matches_known_property_types():
     assert parse_title("Appartement à louer Champerret-Berthier") == "Appartement à louer"
     assert parse_title("Studio à louer proche métro") == "Studio à louer"
+
+
+def _card(html: str):
+    return BeautifulSoup(html, "html.parser").select_one(
+        '[data-testid="serp-core-classified-card-testid"]'
+    )
+
+
+def test_parse_seloger_card_skips_zero_surface():
+    html = """
+    <div data-testid="serp-core-classified-card-testid" id="classified-card-999">
+      <a data-testid="card-mfe-covering-link-testid"
+         href="https://www.seloger.com/annonces/locations/appartement/paris-11eme-75/x/999.htm"></a>
+      <div data-testid="cardmfe-price-testid">900 €</div>
+      <div data-testid="cardmfe-keyfacts-testid">0 m² · 2 pièces</div>
+      <div data-testid="cardmfe-description-box-text-test-id">Appartement à louer</div>
+    </div>
+    """
+    assert parse_seloger_card(_card(html)) is None
+
+
+def test_parse_seloger_card_skips_zero_price():
+    html = """
+    <div data-testid="serp-core-classified-card-testid" id="classified-card-998">
+      <a data-testid="card-mfe-covering-link-testid"
+         href="https://www.seloger.com/annonces/locations/appartement/paris-11eme-75/x/998.htm"></a>
+      <div data-testid="cardmfe-price-testid">0 €</div>
+      <div data-testid="cardmfe-keyfacts-testid">45 m² · 2 pièces</div>
+      <div data-testid="cardmfe-description-box-text-test-id">Appartement à louer</div>
+    </div>
+    """
+    assert parse_seloger_card(_card(html)) is None
 
 
 def test_parse_title_matches_sale_listings():

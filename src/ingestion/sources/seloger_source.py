@@ -207,6 +207,16 @@ def parse_seloger_card(
         logger.info("Skipping not appartment listing")
         return None
 
+    surface_m2 = parse_surface_m2(keyfacts or full_text)
+    if not surface_m2:
+        logger.info(f"Skipping Seloger listing without a valid surface: {source_id}")
+        return None
+
+    price_eur = parse_price_eur(price_text or full_text)
+    if not price_eur:
+        logger.info(f"Skipping Seloger listing without a valid price: {source_id}")
+        return None
+
     postal_code = parse_postal_code(header_text or full_text)
     floor_info = parse_floor_info(keyfacts or full_text)
 
@@ -220,8 +230,8 @@ def parse_seloger_card(
         postal_code=postal_code,
         address=address,
         district_name=parse_district_name(address or header_text or full_text),
-        price_eur=parse_price_eur(price_text or full_text),
-        surface_m2=parse_surface_m2(keyfacts or full_text),
+        price_eur=price_eur,
+        surface_m2=surface_m2,
         rooms=parse_rooms(keyfacts or full_text),
         bedrooms=None,
         is_rental=is_rental,
