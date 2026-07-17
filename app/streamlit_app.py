@@ -280,6 +280,20 @@ st.markdown(
     .stLinkButton a {
         display: none;
     }
+
+    /* Mobile: stack image above info instead of side-by-side — the fixed
+       240px image otherwise leaves too little width for price/specs/CTA
+       on a phone in portrait. */
+    @media (max-width: 520px) {
+        .listing-card {
+            flex-direction: column;
+        }
+        .listing-img {
+            width: 100%;
+            min-width: 100%;
+            height: 200px;
+        }
+    }
     </style>
     """,
     unsafe_allow_html=True,
