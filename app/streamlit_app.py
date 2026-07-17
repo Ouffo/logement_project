@@ -345,52 +345,81 @@ def _description_fingerprint(text) -> str | None:
     return hashlib.md5(normalized.encode()).hexdigest()
 
 
-def _images_match(hash_a, hash_b, threshold: int = IMAGE_PHASH_MATCH_THRESHOLD) -> bool:
-    if not isinstance(hash_a, str) or not isinstance(hash_b, str):
-        return False
-    try:
-        return (imagehash.hex_to_hash(hash_a) - imagehash.hex_to_hash(hash_b)) <= threshold
-    except ValueError:
-        return False
+def _parse_phash(value):
+    if isinstance(value, str):
+        try:
+            return imagehash.hex_to_hash(value)
+        except ValueError:
+            return None
+    return None
 
 
-def _is_same_listing(row_a, row_b) -> bool:
-    # Same site listings are already unique by construction; only worth
-    # comparing across different sources.
-    if row_a.get("postal_code") != row_b.get("postal_code"):
-        return False
-    if row_a.get("rooms") != row_b.get("rooms"):
-        return False
-
-    price_a, price_b = row_a.get("price_eur"), row_b.get("price_eur")
+def _is_same_listing(candidate: dict, other: dict) -> bool:
+    # postal_code and rooms already match by construction — see the
+    # grouping in _deduplicate — so only price/surface/photo are left.
+    price_a, price_b = candidate["price_eur"], other["price_eur"]
     if pd.isna(price_a) or pd.isna(price_b) or abs(price_a - price_b) > 1000:
         return False
 
-    surface_a, surface_b = row_a.get("surface_m2"), row_b.get("surface_m2")
+    surface_a, surface_b = candidate["surface_m2"], other["surface_m2"]
     if pd.isna(surface_a) or pd.isna(surface_b) or abs(surface_a - surface_b) > 1:
         return False
 
     # Same core facts (location/price/surface/rooms) alone isn't proof it's
     # the same unit — confirm with the photo, falling back to the
     # description text for listings without a usable image hash.
-    if _images_match(row_a.get("image_phash"), row_b.get("image_phash")):
-        return True
+    hash_a, hash_b = candidate["phash"], other["phash"]
+    if hash_a is not None and hash_b is not None:
+        if (hash_a - hash_b) <= IMAGE_PHASH_MATCH_THRESHOLD:
+            return True
 
-    fp_a = _description_fingerprint(row_a.get("description"))
-    fp_b = _description_fingerprint(row_b.get("description"))
+    fp_a, fp_b = candidate["fingerprint"], other["fingerprint"]
     return fp_a is not None and fp_a == fp_b
 
 
 def _deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     df = df.sort_values("collected_at", ascending=False).reset_index(drop=True)
+
+    # Precompute the phash object and description fingerprint once per row
+    # instead of re-parsing them on every pairwise comparison, and bucket by
+    # (postal_code, rooms) — a hard requirement for a match anyway — so each
+    # row is only ever compared against real candidates, not the whole set.
+    records = df.to_dict("records")
+    for record in records:
+        record["phash"] = _parse_phash(record.get("image_phash"))
+        record["fingerprint"] = _description_fingerprint(record.get("description"))
+
+    groups: dict[tuple, list[int]] = {}
     kept_indices: list[int] = []
 
-    for idx, row in df.iterrows():
-        if any(_is_same_listing(row, df.loc[kept_idx]) for kept_idx in kept_indices):
+    for idx, record in enumerate(records):
+        group_key = (record.get("postal_code"), record.get("rooms"))
+        candidates = groups.setdefault(group_key, [])
+
+        if any(_is_same_listing(record, records[c]) for c in candidates):
             continue
+
         kept_indices.append(idx)
+        candidates.append(idx)
 
     return df.loc[kept_indices]
+
+
+@st.cache_data(ttl=300)
+def get_mode_listings(is_rental_mode: bool) -> tuple[pd.DataFrame, "pd.Timestamp | None"]:
+    df = load_listings()
+    df = df[df["is_rental"] == is_rental_mode].reset_index(drop=True)
+
+    if df.empty:
+        return df, None
+
+    last_update = df["last_seen_at"].dropna().max()
+
+    df = _deduplicate(df)
+    df = df.sort_values("score", ascending=False, na_position="last").drop(
+        columns=["description", "collected_at", "last_seen_at"]
+    )
+    return df, last_update
 
 
 _ENERGY_CLASSES = ["A", "B", "C", "D", "E", "F", "G"]
@@ -558,23 +587,24 @@ with _h1:
     )
 
 # ── Data ─────────────────────────────────────────────────────────────────────
-df = load_listings()
+_all_listings = load_listings()
 
-if df.empty:
+if _all_listings.empty:
     st.warning("Aucune annonce en base pour l'instant.")
     st.stop()
 
 # ── Mode toggle (location / achat) ────────────────────────────────────────────
 mode = st.radio("Mode", ["Location", "Achat"], horizontal=True, label_visibility="collapsed")
 is_rental_mode = mode == "Location"
-df = df[df["is_rental"] == is_rental_mode].reset_index(drop=True)
+
+with st.spinner("Chargement des annonces..."):
+    df, _last_update = get_mode_listings(is_rental_mode)
 
 if df.empty:
     st.info(f"Aucune annonce en {'location' if is_rental_mode else 'achat'} pour l'instant.")
     st.stop()
 
 # ── Last update timestamp ─────────────────────────────────────────────────────
-_last_update = df["last_seen_at"].dropna().max()
 with _h2:
     if pd.notna(_last_update):
         _last_update_str = pd.Timestamp(_last_update).strftime("%d/%m/%Y à %H:%M")
@@ -585,12 +615,6 @@ with _h2:
             """,
             unsafe_allow_html=True,
         )
-
-# ── Deduplication ────────────────────────────────────────────────────────────
-df = _deduplicate(df)
-df = df.sort_values("score", ascending=False, na_position="last").drop(
-    columns=["description", "collected_at", "last_seen_at"]
-)
 
 # ── Filters ──────────────────────────────────────────────────────────────────
 with st.container():
