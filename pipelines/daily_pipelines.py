@@ -14,7 +14,7 @@ from src.ingestion.sources.bienici_source import BieniciSource
 from src.ingestion.sources.leboncoin_source import LeboncoinSource
 from src.ingestion.sources.pap_source import PapSource
 from src.ingestion.sources.seloger_source import SeLogerSource
-from src.scoring.image_scorer import score_listing_image
+from src.scoring.image_scorer import backfill_listing_image_phash, score_listing_image
 from src.scoring.ranker import compute_listing_score
 from src.storage.db import SessionLocal
 from src.storage.orm_models import RentalListingORM
@@ -24,11 +24,13 @@ from src.storage.registry import (
     FETCH_SOURCE_LOCK_IDS,
     FINAL_SCORING_LOCK_ID,
     IMAGE_SCORING_LOCK_ID,
+    PHASH_BACKFILL_LOCK_ID,
     SOURCE_REGISTRY,
 )
 from src.storage.repository import (
     deduplicate_listings,
     enrich_listings,
+    get_listings_to_backfill_phash,
     get_listings_to_enrich,
     get_listings_to_score_image,
     mark_missing_listings_inactive,
@@ -340,6 +342,53 @@ def run_image_scoring():
 
 
 @retry_on_disconnect()
+def run_backfill_image_phash():
+    session = SessionLocal()
+
+    acquired = session.execute(
+        text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": PHASH_BACKFILL_LOCK_ID}
+    ).scalar()
+    if not acquired:
+        logger.warning("Phash backfill already running — aborting to avoid lock conflicts")
+        session.close()
+        return
+
+    success = False
+
+    try:
+        listings = get_listings_to_backfill_phash(session)
+        logger.info(f"Backfilling image phash for {len(listings)} listings")
+
+        for i, listing in enumerate(listings, start=1):
+            backfill_listing_image_phash(listing)
+            if i % 20 == 0:
+                session.commit()
+                logger.info(f"Committed phash backfill progress: {i}/{len(listings)}")
+
+        session.commit()
+        success = True
+        logger.info("Committed image phash backfill")
+
+    except Exception:
+        session.rollback()
+        logger.exception("Backfill image phash ends with error")
+        raise
+
+    finally:
+        logger.info("=" * 50)
+        if success:
+            logger.info("Backfill image phash finished successfully")
+        else:
+            logger.info("Backfill image phash finished with error")
+
+        logger.info("=" * 50)
+        session.execute(
+            text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": PHASH_BACKFILL_LOCK_ID}
+        ).scalar()
+        session.close()
+
+
+@retry_on_disconnect()
 def run_final_scoring():
     session = SessionLocal()
 
@@ -391,6 +440,7 @@ def main():
             "extract-save-source",
             "enrich-source",
             "image-scoring",
+            "backfill-image-phash",
             "final-scoring",
             "all",
         ],
@@ -426,6 +476,9 @@ def main():
 
     elif args.task == "image-scoring":
         run_image_scoring()
+
+    elif args.task == "backfill-image-phash":
+        run_backfill_image_phash()
 
     elif args.task == "final-scoring":
         run_final_scoring()

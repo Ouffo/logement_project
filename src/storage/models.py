@@ -41,5 +41,6 @@ class RentalListing(BaseModel):
     details_fetched_at: datetime | None = None
 
     image_score: float | None = None
+    image_phash: str | None = None
 
     relevance_score: Optional[float] = None

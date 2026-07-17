@@ -56,6 +56,7 @@ class RentalListingORM(Base):
 
     image_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     image_scored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    image_phash: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(default=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)

@@ -204,17 +204,17 @@ def parse_seloger_card(
 
     title = parse_title(header_text or full_text)
     if title is None:
-        logger.info("Skipping not appartment listing")
+        logger.info(f"Skipping not appartment listing : {url}")
         return None
 
     surface_m2 = parse_surface_m2(keyfacts or full_text)
     if not surface_m2:
-        logger.info(f"Skipping Seloger listing without a valid surface: {source_id}")
+        logger.info(f"Skipping Seloger listing without a valid surface: {source_id}: {url}")
         return None
 
     price_eur = parse_price_eur(price_text or full_text)
     if not price_eur:
-        logger.info(f"Skipping Seloger listing without a valid price: {source_id}")
+        logger.info(f"Skipping Seloger listing without a valid price: {source_id}: {url}")
         return None
 
     postal_code = parse_postal_code(header_text or full_text)

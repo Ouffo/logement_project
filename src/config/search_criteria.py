@@ -9,7 +9,18 @@ SEARCH_CRITERIA = {
 
 PURCHASE_SEARCH_CRITERIA = {
     "city": "Paris",
-    "preferred_areas": ["75013", "75014", "75015", "75005", "75006"],
+    "preferred_areas": [
+        "75001",
+        "75002",
+        "75003",
+        "75004",
+        "75005",
+        "75006",
+        "75009",
+        "75010",
+        "75011",
+        "75014",
+    ],
     "max_price": 650000,
     "min_surface_m2": 50,
     "min_rooms": 3,

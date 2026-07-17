@@ -3,6 +3,7 @@ import re
 import sys
 from pathlib import Path
 
+import imagehash
 import pandas as pd
 import streamlit as st
 from sqlalchemy import or_
@@ -10,6 +11,7 @@ from sqlalchemy import or_
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT))
 
+from src.scoring.image_scorer import IMAGE_PHASH_MATCH_THRESHOLD  # noqa: E402
 from src.storage.db import SessionLocal  # noqa: E402
 from src.storage.orm_models import RentalListingORM  # noqa: E402
 
@@ -313,12 +315,15 @@ def load_listings() -> pd.DataFrame:
                     "surface_m2": listing.surface_m2,
                     "rooms": listing.rooms,
                     "bedrooms": listing.bedrooms,
+                    "floor": listing.floor,
+                    "is_top_floor": listing.is_top_floor,
                     "furnished": listing.furnished,
                     "parking": listing.parking,
                     "quiet": listing.quiet,
                     "score": listing.relevance_score,
                     "url": listing.url,
                     "image_url": listing.image_url,
+                    "image_phash": listing.image_phash,
                     "energy_class": listing.energy_class,
                     "construction_year": listing.construction_year,
                     "posted_at": listing.posted_at,
@@ -338,6 +343,54 @@ def _description_fingerprint(text) -> str | None:
         return None
     normalized = re.sub(r"\s+", " ", text.lower().strip())[:200]
     return hashlib.md5(normalized.encode()).hexdigest()
+
+
+def _images_match(hash_a, hash_b, threshold: int = IMAGE_PHASH_MATCH_THRESHOLD) -> bool:
+    if not isinstance(hash_a, str) or not isinstance(hash_b, str):
+        return False
+    try:
+        return (imagehash.hex_to_hash(hash_a) - imagehash.hex_to_hash(hash_b)) <= threshold
+    except ValueError:
+        return False
+
+
+def _is_same_listing(row_a, row_b) -> bool:
+    # Same site listings are already unique by construction; only worth
+    # comparing across different sources.
+    if row_a.get("postal_code") != row_b.get("postal_code"):
+        return False
+    if row_a.get("rooms") != row_b.get("rooms"):
+        return False
+
+    price_a, price_b = row_a.get("price_eur"), row_b.get("price_eur")
+    if pd.isna(price_a) or pd.isna(price_b) or abs(price_a - price_b) > 1000:
+        return False
+
+    surface_a, surface_b = row_a.get("surface_m2"), row_b.get("surface_m2")
+    if pd.isna(surface_a) or pd.isna(surface_b) or abs(surface_a - surface_b) > 1:
+        return False
+
+    # Same core facts (location/price/surface/rooms) alone isn't proof it's
+    # the same unit — confirm with the photo, falling back to the
+    # description text for listings without a usable image hash.
+    if _images_match(row_a.get("image_phash"), row_b.get("image_phash")):
+        return True
+
+    fp_a = _description_fingerprint(row_a.get("description"))
+    fp_b = _description_fingerprint(row_b.get("description"))
+    return fp_a is not None and fp_a == fp_b
+
+
+def _deduplicate(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.sort_values("collected_at", ascending=False).reset_index(drop=True)
+    kept_indices: list[int] = []
+
+    for idx, row in df.iterrows():
+        if any(_is_same_listing(row, df.loc[kept_idx]) for kept_idx in kept_indices):
+            continue
+        kept_indices.append(idx)
+
+    return df.loc[kept_indices]
 
 
 _ENERGY_CLASSES = ["A", "B", "C", "D", "E", "F", "G"]
@@ -360,6 +413,44 @@ def render_energy_label(energy_class: str) -> str:
 
 def _display_source(source: str) -> str:
     return source.removesuffix("_sale") if isinstance(source, str) else source
+
+
+def _arrondissement_label(postal_code: str) -> str:
+    if isinstance(postal_code, str) and postal_code.startswith("75") and len(postal_code) == 5:
+        return f"{int(postal_code[3:])}e"
+    return postal_code
+
+
+def _resolve_toggle_all_selection(selection: list[str], prev: list[str]) -> list[str]:
+    added = [v for v in selection if v not in prev]
+
+    if "Tous" in added:
+        # "Tous" was just checked alongside others -> it wins, drop the rest.
+        return ["Tous"]
+    if selection and "Tous" in selection:
+        # A specific option was just checked while "Tous" was still on -> a
+        # specific pick always overrides "Tous".
+        return [v for v in selection if v != "Tous"]
+    if not selection:
+        # Nothing left checked -> fall back to "Tous" rather than an empty,
+        # confusing filter state.
+        return ["Tous"]
+    return selection
+
+
+def _make_toggle_all_on_change(key: str):
+    def _on_change():
+        selection = st.session_state.get(key, [])
+        prev = st.session_state.get(f"_{key}_prev", ["Tous"])
+        resolved = _resolve_toggle_all_selection(selection, prev)
+        st.session_state[key] = resolved
+        st.session_state[f"_{key}_prev"] = resolved
+
+    return _on_change
+
+
+_on_arrondissement_change = _make_toggle_all_on_change("arr_filter")
+_on_floor_change = _make_toggle_all_on_change("floor_filter")
 
 
 def score_class(score):
@@ -496,16 +587,9 @@ with _h2:
         )
 
 # ── Deduplication ────────────────────────────────────────────────────────────
-df["_desc_fp"] = df["description"].apply(_description_fingerprint)
-has_fp = df["_desc_fp"].notna()
-df_with_fp = (
-    df[has_fp]
-    .sort_values("collected_at", ascending=False)
-    .drop_duplicates(subset=["_desc_fp"], keep="first")
-)
-df = pd.concat([df_with_fp, df[~has_fp]], ignore_index=True)
+df = _deduplicate(df)
 df = df.sort_values("score", ascending=False, na_position="last").drop(
-    columns=["_desc_fp", "description", "collected_at", "last_seen_at"]
+    columns=["description", "collected_at", "last_seen_at"]
 )
 
 # ── Filters ──────────────────────────────────────────────────────────────────
@@ -524,11 +608,26 @@ with st.container():
     with c3:
         source_opts = ["Toutes"] + sorted({_display_source(s) for s in df["source"].dropna()})
         source = st.selectbox("Source", source_opts)
+    label_to_postal = {_arrondissement_label(pc): pc for pc in df["postal_code"].dropna().unique()}
     with c4:
-        city_opts = ["Tous"] + sorted(df["city"].dropna().unique().tolist())
-        city_filter = st.selectbox("Lieu", city_opts)
+        if is_rental_mode:
+            city_opts = ["Tous"] + sorted(df["city"].dropna().unique().tolist())
+            city_filter = st.selectbox("Lieu", city_opts)
+            arrondissement_filter = ["Tous"]
+        else:
+            arr_opts = ["Tous"] + sorted(
+                label_to_postal, key=lambda label: int(re.sub(r"\D", "", label) or 0)
+            )
+            arrondissement_filter = st.multiselect(
+                "Arrondissement",
+                arr_opts,
+                default=["Tous"],
+                key="arr_filter",
+                on_change=_on_arrondissement_change,
+            )
+            city_filter = "Tous"
 
-    c5, c6, c7 = st.columns([2, 2, 2])
+    c5, c6, c7, c8 = st.columns([2, 2, 2, 2])
     with c5:
         energy_opts = ["Toutes"] + _ENERGY_CLASSES
         energy_max = st.selectbox(
@@ -542,6 +641,19 @@ with st.container():
         include_unknown_year = st.checkbox("Inclure annonces sans année", value=True)
     with c7:
         sort_by_date = st.toggle("Afficher par ordre récent", value=False)
+    with c8:
+        if is_rental_mode:
+            floor_filter = ["Tous"]
+        else:
+            floor_values = sorted({int(f) for f in df["floor"].dropna().unique()})
+            floor_opts = ["Tous", "Dernier étage"] + [str(v) for v in floor_values]
+            floor_filter = st.multiselect(
+                "Étage",
+                floor_opts,
+                default=["Tous"],
+                key="floor_filter",
+                on_change=_on_floor_change,
+            )
 
 # ── Filtering ────────────────────────────────────────────────────────────────
 filtered = df[(df["price_eur"] <= max_price) & (df["surface_m2"] >= min_surface)]
@@ -550,6 +662,21 @@ if source != "Toutes":
 
 if city_filter != "Tous":
     filtered = filtered[filtered["city"] == city_filter]
+
+if not is_rental_mode and arrondissement_filter and "Tous" not in arrondissement_filter:
+    selected_postals = [
+        label_to_postal[label] for label in arrondissement_filter if label in label_to_postal
+    ]
+    filtered = filtered[filtered["postal_code"].isin(selected_postals)]
+
+if not is_rental_mode and floor_filter and "Tous" not in floor_filter:
+    mask = pd.Series(False, index=filtered.index)
+    if "Dernier étage" in floor_filter:
+        mask = mask | filtered["is_top_floor"].fillna(False)
+    numeric_floors = [int(v) for v in floor_filter if v != "Dernier étage"]
+    if numeric_floors:
+        mask = mask | filtered["floor"].isin(numeric_floors)
+    filtered = filtered[mask]
 
 if energy_max != "Toutes":
     allowed = _ENERGY_CLASSES[: _ENERGY_CLASSES.index(energy_max) + 1]

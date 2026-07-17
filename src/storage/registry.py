@@ -31,3 +31,4 @@ ENRICH_LOCK_IDS = {"enrich_" + name: _lock_id("enrich_" + name) for name in SOUR
 
 IMAGE_SCORING_LOCK_ID = _lock_id("image_scoring")
 FINAL_SCORING_LOCK_ID = _lock_id("final_scoring")
+PHASH_BACKFILL_LOCK_ID = _lock_id("phash_backfill")

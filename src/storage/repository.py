@@ -147,6 +147,16 @@ def get_listings_to_score_image(session) -> list[RentalListingORM]:
     )
 
 
+def get_listings_to_backfill_phash(session) -> list[RentalListingORM]:
+    return (
+        session.query(RentalListingORM)
+        .filter(RentalListingORM.is_active)
+        .filter(RentalListingORM.image_url.is_not(None))
+        .filter(RentalListingORM.image_phash.is_(None))
+        .all()
+    )
+
+
 def clean_htmls(path: str):
     folder = Path(path)
 
