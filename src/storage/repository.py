@@ -49,6 +49,7 @@ def save_listing(
     db_listing.furnished = listing.furnished
     db_listing.parking = listing.parking
     db_listing.quiet = listing.quiet
+    db_listing.clear_view = listing.clear_view
     db_listing.image_url = listing.image_url
     db_listing.posted_at = listing.posted_at
     db_listing.collected_at = listing.collected_at
@@ -109,6 +110,15 @@ def deduplicate_listings(listings):
     return deduped
 
 
+# A real detail page is at least tens of KB; a failed/timed-out fetch (or a
+# listing that's been taken down) can come back as a near-empty shell like
+# "<html><head></head><body></body></html>" (39 bytes). Caching that would
+# permanently "poison" the listing: fetch_detail_htmls only re-fetches when
+# the cache file is missing, so a bad page would be read back as-is forever
+# and silently enriched with all-null data instead of being retried.
+MIN_VALID_DETAIL_HTML_LENGTH = 500
+
+
 def enrich_listings(
     source: RentalListingSource,
     listings: list[RentalListingORM],
@@ -121,6 +131,14 @@ def enrich_listings(
         folder.mkdir(parents=True, exist_ok=True)
 
         for listing, html in detail_htmls:
+            if len(html) < MIN_VALID_DETAIL_HTML_LENGTH:
+                logger.warning(
+                    f"Skipping suspiciously empty detail page for {source.name} "
+                    f"listing {listing.source_id} ({len(html)} bytes) — not "
+                    "caching it so it gets retried on the next enrich run"
+                )
+                continue
+
             file_path = folder / f"{listing.source_id}.html"
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(html)

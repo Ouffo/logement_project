@@ -17,6 +17,7 @@ from src.utils.scrapping import (
     FloorInfo,
     city_from_postal_code,
     get_next_page_url,
+    has_clear_view,
     parse_floor_info,
 )
 
@@ -97,6 +98,7 @@ def parse_bienici_search_html(
             furnished=("meublé" in full_text.lower() or "meublée" in full_text.lower()),
             parking="parking" in full_text.lower(),
             quiet=("calme" in full_text.lower() or "silencieux" in full_text.lower()),
+            clear_view=has_clear_view(full_text),
             posted_at=None,
             relevance_score=None,
             image_url=image_url,

@@ -43,6 +43,7 @@ class RentalListingORM(Base):
     furnished: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     parking: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     quiet: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    clear_view: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

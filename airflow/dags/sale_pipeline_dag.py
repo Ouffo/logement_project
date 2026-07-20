@@ -6,7 +6,13 @@ from docker.types import Mount
 from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
 
-SOURCE_NAMES = ["pap_sale", "bienici_sale", "seloger_sale"]
+SOURCE_NAMES = [
+    "pap_sale",
+    "bienici_sale",
+    "seloger_sale",
+    "century_sale",
+    "maison_et_appartement_sale",
+]
 
 PROJECT_ROOT = os.environ["PROJECT_ROOT"]
 HOST_UID = os.getenv("HOST_UID", "1000")

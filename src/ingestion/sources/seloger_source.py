@@ -21,6 +21,7 @@ from src.utils.scrapping import (
     EXTRA_CITY_NAMES_PATTERN,
     EXTRA_POSTAL_CODES_PATTERN,
     city_from_postal_code,
+    has_clear_view,
     parse_floor_info,
 )
 
@@ -240,6 +241,7 @@ def parse_seloger_card(
         furnished="meublé" in (description or "").lower(),
         parking="parking" in (description or full_text or "").lower(),
         quiet="calme" in (description or full_text or "").lower(),
+        clear_view=has_clear_view(description or full_text),
         energy_class=parse_energy_class(card),
         posted_at=None,
         image_url=image_url,

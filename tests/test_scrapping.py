@@ -1,8 +1,11 @@
 from src.utils.scrapping import (
+    _normalize_url_for_comparison,
     combine_htmls,
     extract_body_content,
     extract_leboncoin_search_content,
+    has_clear_view,
     parse_floor,
+    parse_floor_info,
 )
 
 
@@ -111,6 +114,98 @@ def test_parse_floor_ignores_plural_even_with_au():
     # "étages" (building total) shouldn't be confused with "étage"
     # (this listing's floor), even preceded by "au".
     assert parse_floor("au 3 étages") is None
+
+
+def test_parse_floor_bare_e_grave_suffix():
+    # Real maisonsetappartements.fr listing: "rue Beaunier au 4è étage".
+    assert parse_floor("rue Beaunier au 4è étage d'un immeuble bien entretenu") == 4
+
+
+def test_parse_floor_eme_with_acute_accent_typo():
+    # Real listing: "parfaitement agencé au 2 éme étage sans ascenseur" —
+    # "éme" (acute accent) instead of the standard "ème" (grave), with a
+    # space before it.
+    assert parse_floor("parfaitement agencé au 2 éme étage sans ascenseur") == 2
+
+
+def test_parse_floor_mangled_question_mark_suffix():
+    # Real listing: the site's own encoding mangles the ordinal marker into
+    # a literal "?" ("Il est situé au 2? étage d'un immeuble de 1900").
+    assert parse_floor("Il est situé au 2? étage d'un immeuble de 1900") == 2
+
+
+def test_parse_floor_ordinal_et_dernier_etage():
+    # Real listing: "au 7è et DERNIER ÉTAGE d'un immeuble" — the ordinal
+    # isn't directly adjacent to "étage".
+    info = parse_floor_info("rue de la Tombe Issoire au 7è et DERNIER ÉTAGE d'un immeuble")
+    assert info.floor == 7
+    assert info.is_top_floor is True
+
+
+def test_parse_floor_second_ordinal_word():
+    assert parse_floor("au second étage") == 2
+
+
+def test_parse_floor_second_et_dernier_etage():
+    # Real listing: "au second et dernier étage d'un immeuble ancien".
+    info = parse_floor_info("au second et dernier étage d'un immeuble ancien")
+    assert info.floor == 2
+    assert info.is_top_floor is True
+
+
+def test_parse_floor_rez_de_jardin_returns_zero():
+    # "rez-de-jardin" (garden level) is this site's synonym for ground
+    # floor, distinct from "rez-de-chaussée" but equivalent for our purposes.
+    assert parse_floor("situé en rez-de-jardin d'un immeuble des années 80") == 0
+
+
+def test_has_clear_view_none_input():
+    assert has_clear_view(None) is False
+
+
+def test_has_clear_view_no_match():
+    assert has_clear_view("Studio calme au 3e étage") is False
+
+
+def test_has_clear_view_singular():
+    assert has_clear_view("Appartement avec une vue dégagée") is True
+
+
+def test_has_clear_view_plural():
+    # Regression: a real Century21 listing described as "en dernier étage
+    # aux vues dégagées" (plural) was missed by a singular-only match.
+    assert has_clear_view("appartement de trois pièces en dernier étage aux vues dégagées") is True
+
+
+def test_has_clear_view_unaccented():
+    assert has_clear_view("vue degagee sur jardin") is True
+
+
+def test_has_clear_view_sans_vis_a_vis():
+    assert has_clear_view("calme et sans vis-à-vis") is True
+
+
+def test_has_clear_view_sans_vis_a_vis_unaccented():
+    assert has_clear_view("calme et sans vis a vis") is True
+
+
+def test_normalize_url_for_comparison_collapses_stray_double_slash():
+    # Regression: maisonsetappartements.fr emits a stray "//" mid-path on
+    # some pagination links (but not others) for the exact same page,
+    # which used to defeat a plain string comparison and loop forever.
+    a = "https://www.maisonsetappartements.fr//views/Search.php?page=1"
+    b = "https://www.maisonsetappartements.fr/views/Search.php?page=1"
+    assert _normalize_url_for_comparison(a) == _normalize_url_for_comparison(b)
+
+
+def test_normalize_url_for_comparison_preserves_scheme_double_slash():
+    assert _normalize_url_for_comparison("https://example.com/a") == "https://example.com/a"
+
+
+def test_normalize_url_for_comparison_differs_for_different_pages():
+    a = "https://example.com/search?page=1"
+    b = "https://example.com/search?page=2"
+    assert _normalize_url_for_comparison(a) != _normalize_url_for_comparison(b)
 
 
 def test_extract_body_content_removes_boilerplate_tags():

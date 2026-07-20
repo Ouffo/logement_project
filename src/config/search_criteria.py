@@ -4,7 +4,7 @@ SEARCH_CRITERIA = {
     "max_price": 1200,
     "min_surface_m2": 25,
     "min_rooms": 2,
-    "preferences": {"furnished": True, "parking": True, "quiet": True},
+    "preferences": {"furnished": True, "parking": True, "quiet": True, "clear_view": True},
 }
 
 PURCHASE_SEARCH_CRITERIA = {
@@ -24,7 +24,7 @@ PURCHASE_SEARCH_CRITERIA = {
     "max_price": 650000,
     "min_surface_m2": 50,
     "min_rooms": 3,
-    "preferences": {"furnished": False, "parking": False, "quiet": True},
+    "preferences": {"furnished": False, "parking": False, "quiet": True, "clear_view": True},
 }
 
 

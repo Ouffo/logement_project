@@ -11,6 +11,7 @@ from src.storage.models import RentalListing
 from src.storage.orm_models import RentalListingORM
 from src.storage.repository import (
     deduplicate_listings,
+    enrich_listings,
     get_listings_to_enrich,
     get_listings_to_score_image,
     mark_missing_listings_inactive,
@@ -144,6 +145,46 @@ def test_deduplicate_listings_keeps_same_source_id_from_different_sources():
     b = SimpleNamespace(source="leboncoin", source_id="1")
 
     assert deduplicate_listings([a, b]) == [a, b]
+
+
+class _FakeSource:
+    def __init__(self, detail_storage_path, htmls_by_id):
+        self.name = "fake"
+        self.detail_storage_path = str(detail_storage_path)
+        self._htmls_by_id = htmls_by_id
+        self.enriched_ids = []
+
+    def fetch_detail_htmls(self, listings):
+        return [(listing, self._htmls_by_id[listing.source_id]) for listing in listings]
+
+    def enrich_listing(self, listing, html):
+        self.enriched_ids.append(listing.source_id)
+
+
+def test_enrich_listings_skips_and_does_not_cache_empty_detail_page(tmp_path):
+    # Regression: a failed/timed-out fetch (or a listing taken down between
+    # extract-save and enrich) can come back as a near-empty shell like
+    # "<html><head></head><body></body></html>" — caching that would
+    # permanently poison the listing, since fetch_detail_htmls only
+    # re-fetches when the cache file is missing.
+    listing = _orm_listing(source_id="empty")
+    source = _FakeSource(tmp_path, {"empty": "<html><head></head><body></body></html>"})
+
+    enrich_listings(source, [listing])
+
+    assert source.enriched_ids == []
+    assert not (tmp_path / "empty.html").exists()
+
+
+def test_enrich_listings_caches_and_enriches_valid_detail_page(tmp_path):
+    listing = _orm_listing(source_id="valid")
+    html = "<html><body>" + "x" * 1000 + "</body></html>"
+    source = _FakeSource(tmp_path, {"valid": html})
+
+    enrich_listings(source, [listing])
+
+    assert source.enriched_ids == ["valid"]
+    assert (tmp_path / "valid.html").read_text(encoding="utf-8") == html
 
 
 def test_save_listing_creates_new_listing(session):

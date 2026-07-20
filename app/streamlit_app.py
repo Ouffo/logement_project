@@ -185,6 +185,7 @@ st.markdown(
     .tag-furnished  { background: #ede9fe; color: #6d28d9; }
     .tag-parking    { background: #dbeafe; color: #1d4ed8; }
     .tag-quiet      { background: #d1fae5; color: #065f46; }
+    .tag-clear-view { background: #e0f2fe; color: #0369a1; }
 
     /* Score badge */
     .score-badge {
@@ -334,6 +335,7 @@ def load_listings() -> pd.DataFrame:
                     "furnished": listing.furnished,
                     "parking": listing.parking,
                     "quiet": listing.quiet,
+                    "clear_view": listing.clear_view,
                     "score": listing.relevance_score,
                     "url": listing.url,
                     "image_url": listing.image_url,
@@ -397,24 +399,47 @@ def _deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     # Precompute the phash object and description fingerprint once per row
     # instead of re-parsing them on every pairwise comparison, and bucket by
     # (postal_code, rooms) — a hard requirement for a match anyway — so each
-    # row is only ever compared against real candidates, not the whole set.
+    # row is only ever compared against other rows in the same bucket, not
+    # the whole set.
     records = df.to_dict("records")
     for record in records:
         record["phash"] = _parse_phash(record.get("image_phash"))
         record["fingerprint"] = _description_fingerprint(record.get("description"))
 
     groups: dict[tuple, list[int]] = {}
-    kept_indices: list[int] = []
-
     for idx, record in enumerate(records):
         group_key = (record.get("postal_code"), record.get("rooms"))
-        candidates = groups.setdefault(group_key, [])
+        groups.setdefault(group_key, []).append(idx)
 
-        if any(_is_same_listing(record, records[c]) for c in candidates):
-            continue
+    # Union-find over every same-group pair (not just against rows already
+    # kept): a 3-way syndication chain — e.g. the same property worded
+    # identically to source A but differently to source B, with A itself a
+    # duplicate of some more-recent source C — needs the match to A to still
+    # count even after A gets merged away, otherwise A's original row
+    # wrongly survives as if it were a distinct listing.
+    parent = list(range(len(records)))
 
-        kept_indices.append(idx)
-        candidates.append(idx)
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i: int, j: int) -> None:
+        root_i, root_j = find(i), find(j)
+        if root_i != root_j:
+            # rows are sorted most-recent-first, so the lower index is the
+            # freshest — keep it as the representative for the group
+            parent[max(root_i, root_j)] = min(root_i, root_j)
+
+    for indices in groups.values():
+        for a in range(len(indices)):
+            for b in range(a + 1, len(indices)):
+                i, j = indices[a], indices[b]
+                if _is_same_listing(records[i], records[j]):
+                    union(i, j)
+
+    kept_indices = sorted({find(i) for i in range(len(records))})
 
     return df.loc[kept_indices]
 
@@ -520,6 +545,7 @@ def render_card(row):
     furnished = row.get("furnished")
     parking = row.get("parking")
     quiet = row.get("quiet")
+    clear_view = row.get("clear_view")
     score = row.get("score")
     url = row.get("url") or "#"
     energy_class = row.get("energy_class")
@@ -540,6 +566,8 @@ def render_card(row):
         tags_html += '<span class="tag tag-parking">Parking</span>'
     if quiet:
         tags_html += '<span class="tag tag-quiet">Calme</span>'
+    if clear_view:
+        tags_html += '<span class="tag tag-clear-view">Vue dégagée</span>'
     if construction_year and pd.notna(construction_year):
         tags_html += f'<span class="tag tag-year">Construit en {int(construction_year)}</span>'
 

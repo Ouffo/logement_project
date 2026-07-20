@@ -70,6 +70,9 @@ def compute_preferences_score(listing: AnyListing) -> float:
     if prefs["quiet"] and listing.quiet:
         score += 10
 
+    if prefs["clear_view"] and listing.clear_view:
+        score += 5
+
     return score
 
 

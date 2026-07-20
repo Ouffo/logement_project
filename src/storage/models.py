@@ -31,6 +31,7 @@ class RentalListing(BaseModel):
     furnished: Optional[bool] = None
     parking: Optional[bool] = None
     quiet: Optional[bool] = None
+    clear_view: Optional[bool] = None
 
     image_url: Optional[str] = None
     posted_at: Optional[datetime] = None

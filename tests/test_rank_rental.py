@@ -25,6 +25,7 @@ def _listing(**overrides):
         furnished=True,
         parking=True,
         quiet=True,
+        clear_view=False,
         image_url="http://example.com/image.jpg",
         image_score=None,
     )
@@ -145,6 +146,15 @@ def test_compute_preferences_score_all_matched():
 
 def test_compute_preferences_score_none_matched():
     assert compute_preferences_score(_listing(furnished=False, parking=False, quiet=False)) == 0
+
+
+def test_compute_preferences_score_clear_view_bonus():
+    assert (
+        compute_preferences_score(
+            _listing(furnished=False, parking=False, quiet=False, clear_view=True)
+        )
+        == 5
+    )
 
 
 def test_compute_image_score_missing():

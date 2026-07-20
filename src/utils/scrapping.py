@@ -33,10 +33,25 @@ def city_from_postal_code(postal_code: str | None) -> str:
     return POSTAL_CODE_TO_CITY.get(postal_code, "Paris")
 
 
+def has_clear_view(text: str | None) -> bool:
+    if not text:
+        return False
+
+    text = text.lower()
+
+    # "vue"/"vues" + "dégagée"/"dégagé"/"dégagées" (with or without accents)
+    return bool(
+        re.search(r"vues?\s+d[eé]gag[eé]e?s?\b", text)
+        or re.search(r"sans\s+vis[\s-]?[aà][\s-]?vis", text)
+    )
+
+
 FRENCH_ORDINAL_WORDS = {
     "premier": 1,
     "première": 1,
     "premiere": 1,
+    "second": 2,
+    "seconde": 2,
     "deuxième": 2,
     "deuxieme": 2,
     "troisième": 3,
@@ -86,8 +101,17 @@ class FloorInfo:
     is_top_floor: bool | None
 
 
+# Ordinal suffixes seen in real listings after a floor number: "2ème",
+# "1er", "3e", "9ᵉ", plus messier real-world variants — a bare "è" with no
+# "me" ("7è étage"), the "éme" misspelling (é instead of è before "me",
+# "2 éme étage"), and a literal "?" that some sites' own encoding mangles
+# in place of a superscript ordinal marker ("2? étage", also seen outside
+# floor contexts on the same site, e.g. "3?084 €").
+_ORDINAL_SUFFIX_PATTERN = r"(?:ᵉʳ|ᵉ|er|ère|[eèé]me|è|e|\?)"
+
+
 def _parse_floor_from_sentence(sentence: str) -> FloorInfo:
-    if re.search(r"rez.de.chauss[ée]e|\bRDC\b", sentence, flags=re.IGNORECASE):
+    if re.search(r"rez.de.chauss[ée]e|rez.de.jardin|\bRDC\b", sentence, flags=re.IGNORECASE):
         return FloorInfo(floor=0, is_top_floor=None)
 
     floor: int | None = None
@@ -114,11 +138,23 @@ def _parse_floor_from_sentence(sentence: str) -> FloorInfo:
             floor = total_floors if floor_value == -total_floors else floor_value
             is_top_floor = floor == total_floors
 
+    # "7è et dernier étage" — ordinal not directly adjacent to "étage", with
+    # "et dernier" in between instead.
+    if floor is None:
+        match = re.search(
+            rf"(-?\d+)\s*{_ORDINAL_SUFFIX_PATTERN}\s+et\s+dernier\s+[eé]tage",
+            sentence,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            floor = int(match.group(1))
+            is_top_floor = True
+
     # "2e étage", "1er étage (sur 3)" — ordinal directly followed by
     # "étage", with an optional "(sur M)" giving the building's total.
     if floor is None:
         match = re.search(
-            r"(-?\d+)(?:ᵉʳ|ᵉ|er|ère|[eè]me|e)\s+[eé]tage(?:\s*\(sur\s*(\d+)\))?",
+            rf"(-?\d+)\s*{_ORDINAL_SUFFIX_PATTERN}\s+[eé]tage(?:\s*\(sur\s*(\d+)\))?",
             sentence,
             flags=re.IGNORECASE,
         )
@@ -134,18 +170,19 @@ def _parse_floor_from_sentence(sentence: str) -> FloorInfo:
     # arrondissement mentions ("dans le 18e") don't use "au" this way.
     if floor is None:
         match = re.search(
-            r"\bau\s+(-?\d+)(?:ᵉʳ|ᵉ|er|ère|[eè]me|e)\b(?=.*(?:[eé]tage|ascenseur))",
+            rf"\bau\s+(-?\d+)\s*{_ORDINAL_SUFFIX_PATTERN}\b(?=.*(?:[eé]tage|ascenseur))",
             sentence,
             flags=re.IGNORECASE,
         )
         if match:
             floor = int(match.group(1))
 
-    # "au deuxième étage" — spelled-out ordinals, only next to "étage"
-    # since these words aren't used for arrondissements.
+    # "au deuxième étage", "au second et dernier étage" — spelled-out
+    # ordinals, only next to "étage" (optionally via "et dernier") since
+    # these words aren't used for arrondissements.
     if floor is None:
         word_match = re.search(
-            rf"\b({_FRENCH_ORDINAL_WORDS_PATTERN})\b\s+[eé]tage",
+            rf"\b({_FRENCH_ORDINAL_WORDS_PATTERN})\b\s+(?:et\s+dernier\s+)?[eé]tage",
             sentence,
             flags=re.IGNORECASE,
         )
@@ -226,6 +263,13 @@ def simulate_scroll(page):
         page.wait_for_timeout(random.randint(1500, 4000))
 
 
+def _normalize_url_for_comparison(url: str) -> str:
+    # Some sites (e.g. maisonsetappartements.fr) emit a stray double slash
+    # mid-path on some pagination links but not others for the exact same
+    # page, which would otherwise defeat a plain string comparison.
+    return re.sub(r"(?<!:)//+", "/", url)
+
+
 def get_next_page_url(page) -> str | None:
     patterns = [
         page.locator("a[rel='next']"),
@@ -242,6 +286,15 @@ def get_next_page_url(page) -> str | None:
             href = locator.first.get_attribute("href")
             if href:
                 full_url = urljoin(base_url, href)
+                if _normalize_url_for_comparison(full_url) == _normalize_url_for_comparison(
+                    base_url
+                ):
+                    # Some "next" arrows stay present (and keep an href)
+                    # even on the last page instead of being removed —
+                    # pointing right back at the current page, which would
+                    # otherwise loop forever.
+                    logger.info("Next page URL is the same as the current page — stopping")
+                    return None
                 logger.info(f"Next page URL: {full_url}")
                 return full_url
             else:

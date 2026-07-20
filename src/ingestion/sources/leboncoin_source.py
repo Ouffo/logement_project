@@ -22,6 +22,7 @@ from src.utils.scrapping import (
     FloorInfo,
     city_from_postal_code,
     get_next_page_url,
+    has_clear_view,
     parse_floor_info,
 )
 
@@ -411,6 +412,7 @@ def parse_leboncoin_search_html(html: str) -> list[RentalListing]:
             furnished="meublé" in text.lower(),
             parking="parking" in text.lower(),
             quiet=False,
+            clear_view=has_clear_view(combined_text),
             posted_at=None,
             relevance_score=None,
             image_url=image_url,

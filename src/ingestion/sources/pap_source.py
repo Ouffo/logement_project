@@ -21,6 +21,7 @@ from src.utils.scrapping import (
     city_from_postal_code,
     combine_htmls,
     extract_body_content,
+    has_clear_view,
     parse_floor_info,
     simulate_scroll,
 )
@@ -104,6 +105,7 @@ def parse_pap_html(html: str) -> list[RentalListing]:
             furnished="meublé" in description.lower(),
             parking="parking" in description.lower(),
             quiet="calme" in description.lower(),
+            clear_view=has_clear_view(description),
             image_url=image_url,
         )
 
@@ -271,6 +273,7 @@ def parse_pap_detail_html(
                 or "meublé" in full_text.lower(),
                 parking="parking" in full_text.lower(),
                 quiet="calme" in full_text.lower(),
+                clear_view=has_clear_view(full_text),
                 posted_at=posted_at,
                 image_url=image_url,
                 energy_class=energy_class,
@@ -315,6 +318,9 @@ def merge_pap_list_and_detail(
                 furnished=detail.furnished if detail.furnished is not None else base.furnished,
                 parking=detail.parking if detail.parking is not None else base.parking,
                 quiet=detail.quiet if detail.quiet is not None else base.quiet,
+                clear_view=(
+                    detail.clear_view if detail.clear_view is not None else base.clear_view
+                ),
                 posted_at=detail.posted_at or base.posted_at,
                 collected_at=base.collected_at,
                 relevance_score=base.relevance_score,
