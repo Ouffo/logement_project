@@ -12,7 +12,7 @@ SOURCE_NAMES = [
     "seloger_sale",
     "century_sale",
     "maison_et_appartement_sale",
-    "espaces_atypiques_sale"
+    "espaces_atypiques_sale",
 ]
 
 PROJECT_ROOT = os.environ["PROJECT_ROOT"]
