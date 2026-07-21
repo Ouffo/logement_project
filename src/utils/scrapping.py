@@ -227,13 +227,17 @@ def parse_floor(text: str | None) -> int | None:
 
 def dismiss_cookie_banner(page):
     page.wait_for_timeout(2000)  # Wait for 2 seconds to ensure the cookie banner is loaded
-    # cookie_btn = (
-    #     page.get_by_role("button", name="Continuer sans accepter")
-    #     .or_(page.get_by_role("button", name="Tout refuser"))
-    #     .or_(page.get_by_role("button", name="Refuser"))
-    #     .or_(page.get_by_role("button", name="Je refuse"))
-    #     .or_(page.get_by_role("button", name="Decline"))
-    # )
+
+    # espaces-atypiques.com uses Cookiebot, whose "accept all" button has a
+    # stable id (unlike the free-text-matched buttons below) — some sites'
+    # own JS doesn't finish loading page content (e.g. listing results)
+    # until the consent dialog is resolved one way or another.
+    cookiebot_btn = page.locator("#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll")
+    if cookiebot_btn.count() > 0:
+        logger.info("Found Cookiebot accept-all button")
+        cookiebot_btn.first.click()
+        return
+
     cookie_btn = page.locator(
         "button:has-text('Continuer sans accepter'), "
         "a:has-text('Continuer sans accepter'), "
@@ -278,6 +282,10 @@ def get_next_page_url(page) -> str | None:
         page.get_by_role("button", name="Page suivante"),
         page.locator(".pagination-next a"),
         page.locator("[aria-label='Page suivante']"),
+        # Common WordPress pagination plugin markup (e.g.
+        # espaces-atypiques.com): an icon-only arrow with no text or
+        # aria-label, only identifiable by this class combination.
+        page.locator("a.next.page-numbers"),
     ]
     for locator in patterns:
         if locator.count() > 0:

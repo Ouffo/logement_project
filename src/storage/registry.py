@@ -1,5 +1,9 @@
 from src.ingestion.sources.bienici_source import BieniciSaleSource, BieniciSource
 from src.ingestion.sources.century_source import CenturySaleSource, CenturySource
+from src.ingestion.sources.espaces_atypiques_source import (
+    EspacesAtypiquesSaleSource,
+    EspacesAtypiquesSource,
+)
 from src.ingestion.sources.leboncoin_source import LeboncoinSource
 from src.ingestion.sources.maison_et_appartement_source import (
     MaisonEtAppartementSaleSource,
@@ -27,6 +31,8 @@ SOURCE_REGISTRY = {
     "century_sale": CenturySaleSource,
     "maison_et_appartement": MaisonEtAppartementSource,
     "maison_et_appartement_sale": MaisonEtAppartementSaleSource,
+    "espaces_atypiques": EspacesAtypiquesSource,
+    "espaces_atypiques_sale": EspacesAtypiquesSaleSource,
 }
 
 FETCH_SOURCE_LOCK_IDS = {"fetch_" + name: _lock_id("fetch_" + name) for name in SOURCE_REGISTRY}
