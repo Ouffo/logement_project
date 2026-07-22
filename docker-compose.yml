@@ -68,7 +68,7 @@ services:
     depends_on:
       - airflow-postgres
     ports:
-      - "8080:8080"
+      - "${AIRFLOW_BIND_HOST}:8080:8080"
     environment:
       PROJECT_ROOT: ${PROJECT_ROOT}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -84,6 +84,9 @@ services:
       AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
       AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
       AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_FROM}
+
+      AIRFLOW__WEBSERVER__BASE_URL: ${AIRFLOW_BASE_URL}
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "True"
     volumes:
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
