@@ -74,6 +74,22 @@ def test_parse_pap_detail_html_skips_section_without_surface():
     assert parse_pap_detail_html(html) == []
 
 
+def test_parse_pap_detail_html_skips_non_numeric_price():
+    # Regression: parse_price used to raise ValueError on non-numeric price
+    # text, crashing the whole extract-save batch instead of just skipping
+    # this one listing.
+    html = """
+    <section class="listing-detail" data-url="https://www.pap.fr/annonces/x-r1">
+        <h1>Vente appartement <span>Prix sur demande</span></h1>
+        <h2>Paris 75011</h2>
+        <strong>3 pièces</strong>
+        <strong>51 m²</strong>
+    </section>
+    """
+
+    assert parse_pap_detail_html(html) == []
+
+
 def test_parse_pap_detail_html_ignores_price_per_m2_fact():
     # Sale listings show a "X € le m²" fact alongside the real surface;
     # both contain "m²" so the price-per-m² one must not overwrite surface.
@@ -238,6 +254,26 @@ def test_parse_pap_html_skips_listing_without_price():
         <div class="h1">Paris 12e</div>
         <div class="item-price"></div>
         <div class="item-description">Description</div>
+    </div>
+    </body></html>
+    """
+
+    assert parse_pap_html(html) == []
+
+
+def test_parse_pap_html_skips_non_numeric_price():
+    # Regression: parse_price used to raise ValueError on non-numeric price
+    # text (e.g. "Immobilier neuf" for a "programme neuf" listing).
+    html = """
+    <html><body>
+    <div class="search-list-item-alt">
+        <a class="item-title" href="/annonce/x-r1">Bel appartement</a>
+        <div class="h1">Paris 12e</div>
+        <div class="item-price">Immobilier neuf</div>
+        <div class="item-description">Description</div>
+        <ul class="item-tags">
+            <li>30 m²</li>
+        </ul>
     </div>
     </body></html>
     """

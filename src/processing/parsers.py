@@ -2,15 +2,21 @@ import re
 from datetime import UTC, datetime, timedelta
 
 
-def parse_price(price_str: str) -> int:
+def parse_price(price_str: str) -> int | None:
     kept = re.sub(r"[^\d,.]", "", price_str)
 
     last_sep = max(kept.rfind(","), kept.rfind("."))
     if last_sep == -1:
-        return int(kept)
+        # No digits at all (e.g. a "Immobilier neuf" / "Prix sur demande"
+        # placeholder instead of an actual price) — the caller is expected
+        # to skip the listing rather than crash the whole batch on it.
+        return int(kept) if kept else None
 
     integer_part = re.sub(r"[,.]", "", kept[:last_sep])
     fractional_part = kept[last_sep + 1 :]
+
+    if not integer_part:
+        return None
 
     if len(fractional_part) == 3:
         # the separator groups thousands (e.g. "1.200" or "1,200" -> 1200)
@@ -20,7 +26,7 @@ def parse_price(price_str: str) -> int:
     return int(float(f"{integer_part}.{fractional_part}"))
 
 
-def parse_surface(surface_str: str) -> float:
+def parse_surface(surface_str: str) -> float | None:
     # strip the unit ("m²" or the plain-ASCII "m2") so its trailing digit
     # doesn't get mistaken for part of the number
     surface_str = re.sub(r"m\s*[²2]\b", "", surface_str, flags=re.IGNORECASE)
@@ -31,17 +37,19 @@ def parse_surface(surface_str: str) -> float:
         surface_str.replace(",", "."),
     )
 
-    return float(cleaned)
+    # No digits at all — caller is expected to skip the listing rather than
+    # crash the whole batch on it.
+    return float(cleaned) if cleaned else None
 
 
-def parse_rooms(rooms_str: str) -> int:
+def parse_rooms(rooms_str: str) -> int | None:
     cleaned = re.sub(
         r"[^\d]",
         "",
         rooms_str,
     )
 
-    return int(cleaned)
+    return int(cleaned) if cleaned else None
 
 
 WEEKDAYS_FR = {

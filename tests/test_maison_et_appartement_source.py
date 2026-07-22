@@ -106,6 +106,25 @@ def test_parse_maison_et_appartement_search_html_skips_listing_without_surface()
     assert parse_maison_et_appartement_search_html(html) == []
 
 
+def test_parse_maison_et_appartement_search_html_skips_non_numeric_price():
+    # Regression: a real "programme neuf" (off-plan) listing rendered
+    # "Immobilier neuf" instead of a price, which crashed parse_price with
+    # an uncaught ValueError and took down the whole extract-save batch
+    # instead of just skipping this one listing.
+    html = """
+    <article class="blkresult" id="abc">
+        <a class="seeMore" href="https://www.maisonsetappartements.fr/x"></a>
+        <span class="RR_detail1">Appartement à vendre</span>
+        <span class="RR_ville_text">Paris 11Eme</span>
+        <span class="RR_prix">Immobilier neuf</span>
+        <span itemprop="numberOfRooms">2</span>
+        <span itemprop="floorSize">40</span>
+    </article>
+    """
+
+    assert parse_maison_et_appartement_search_html(html) == []
+
+
 def test_parse_maison_et_appartement_search_html_skips_listing_without_link():
     html = """
     <article class="blkresult" id="abc">

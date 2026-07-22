@@ -88,6 +88,21 @@ def test_parse_bienici_search_html_skips_listing_without_surface():
     assert parse_bienici_search_html(html) == []
 
 
+def test_parse_bienici_search_html_skips_non_numeric_price():
+    # Regression: parse_price used to raise ValueError on non-numeric price
+    # text ("Prix sur demande" and similar), crashing the whole batch
+    # instead of just skipping this one listing.
+    html = """
+    <article data-id="abc">
+        <a class="detailedSheetLink" href="/x1"></a>
+        <div class="real-estate-main-info__title">Studio 25 m²</div>
+        <div class="ad-price__the-price">Prix sur demande</div>
+    </article>
+    """
+
+    assert parse_bienici_search_html(html) == []
+
+
 def test_parse_bienici_search_html_defaults_to_paris_without_parseable_postal_code():
     # Regression test: a listing whose address has no recognizable "75XXX"
     # postal code used to crash the whole page (RentalListing.city isn't

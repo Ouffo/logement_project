@@ -90,13 +90,19 @@ def parse_pap_html(html: str) -> list[RentalListing]:
         if image_el:
             image_url = image_el.get("src")
 
+        price_eur = parse_price(price_text)
+
+        if price_eur is None or surface_m2 is None:
+            logger.info(f"Skipping PAP listing without a parseable price/surface: {source_id}")
+            continue
+
         listing = RentalListing(
             source="pap",
             source_id=source_id,
             url=f"https://www.pap.fr{relative_url}",
             title=location,
             description="\n".join(line for line in description.splitlines() if line.strip()),
-            price_eur=parse_price(price_text),
+            price_eur=price_eur,
             surface_m2=surface_m2,
             rooms=rooms,
             bedrooms=bedrooms,
@@ -209,6 +215,10 @@ def parse_pap_detail_html(
             continue
 
         price_eur = parse_price(price_el.get_text(" ", strip=True))
+
+        if price_eur is None:
+            logger.warning(f"Skipping PAP detail without a parseable price: {url}")
+            continue
 
         strong_values = [el.get_text(" ", strip=True) for el in section.select("strong")]
 

@@ -55,6 +55,18 @@ def test_parse_price_with_nbsp_separators():
     assert parse_price(price_str) == 1170
 
 
+def test_parse_price_no_digits_returns_none():
+    # Regression: a "programme neuf" / off-plan placeholder like
+    # "Immobilier neuf" instead of an actual price used to crash with
+    # ValueError: invalid literal for int() with base 10: '', taking down
+    # the whole extract-save batch instead of just that one listing.
+    assert parse_price("Immobilier neuf") is None
+
+
+def test_parse_price_empty_string_returns_none():
+    assert parse_price("") is None
+
+
 def test_parse_surface_plain_digits():
     assert parse_surface("30 m²") == 30.0
 
@@ -75,12 +87,20 @@ def test_parse_surface_ascii_m2_with_decimal_comma():
     assert parse_surface("27,02 m2") == 27.02
 
 
+def test_parse_surface_no_digits_returns_none():
+    assert parse_surface("Non communiqué") is None
+
+
 def test_parse_rooms_with_word_suffix():
     assert parse_rooms("3 pièces") == 3
 
 
 def test_parse_rooms_with_type_prefix():
     assert parse_rooms("T2") == 2
+
+
+def test_parse_rooms_no_digits_returns_none():
+    assert parse_rooms("Studio") is None
 
 
 def test_parse_french_posted_at_aujourdhui(fixed_now):

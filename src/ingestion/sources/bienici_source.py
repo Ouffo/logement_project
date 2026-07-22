@@ -66,9 +66,14 @@ def parse_bienici_search_html(
 
         surface_m2 = parse_bienici_surface(title)
         rooms = parse_bienici_rooms(title)
+        price_eur = parse_price(price_text)
 
         if surface_m2 is None:
             logger.info(f"Skipping Bienici listing without surface: {source_id}")
+            continue
+
+        if price_eur is None:
+            logger.info(f"Skipping Bienici listing without a parseable price: {source_id}")
             continue
 
         postal_code = parse_bienici_postal_code(address)
@@ -90,7 +95,7 @@ def parse_bienici_search_html(
             district_name=address,
             latitude=None,
             longitude=None,
-            price_eur=parse_price(price_text),
+            price_eur=price_eur,
             surface_m2=surface_m2,
             rooms=rooms,
             bedrooms=None,
